@@ -165,6 +165,7 @@ int mp_drv_mode = 0; /* 1 Mptool Fw; 0 Normal Fw */
 #define ROM_LMP_8723b               0x8723
 #define ROM_LMP_8821a               0X8821
 #define ROM_LMP_8761a               0X8761
+#define ROM_LMP_8761b               0X8761
 #define ROM_LMP_8703a               0x8723
 #define ROM_LMP_8763a               0x8763
 #define ROM_LMP_8703b               0x8703
@@ -172,6 +173,7 @@ int mp_drv_mode = 0; /* 1 Mptool Fw; 0 Normal Fw */
 #define ROM_LMP_8822b               0x8822
 #define ROM_LMP_8723d               0x8723
 #define ROM_LMP_8821c               0x8821
+#define ROM_LMP_8822c               0x8822
 
 /* signature: Realtek */
 const uint8_t RTK_EPATCH_SIGNATURE[8] = {0x52,0x65,0x61,0x6C,0x74,0x65,0x63,0x68};
@@ -190,6 +192,10 @@ uint16_t project_id[] = {
     ROM_LMP_8822b,
     ROM_LMP_8723d,
     ROM_LMP_8821c,
+    ROM_LMP_NONE,
+    ROM_LMP_NONE,
+    ROM_LMP_8822c,  //0x0d
+    ROM_LMP_8761b,
     ROM_LMP_NONE
 };
 struct rtk_eversion_evt {
@@ -591,6 +597,7 @@ static inline void hci_set_drvdata(struct hci_dev *hdev, void *data)
 
 #define CONFIG_MAC_OFFSET_GEN_1_2       (0x3C)      //MAC's OFFSET in config/efuse for realtek generation 1~2 bluetooth chip
 #define CONFIG_MAC_OFFSET_GEN_3PLUS     (0x44)      //MAC's OFFSET in config/efuse for rtk generation 3+ bluetooth chip
+#define CONFIG_MAC_OFFSET_GEN_4PLUS     (0x30)      //MAC's OFFSET in config/efuse for rtk generation 4+ bluetooth chip
 
 /*******************************
 **    Reasil patch code
@@ -659,14 +666,14 @@ typedef struct {
 } __attribute__((packed)) download_rp;
 
 
-
-//Define ioctl cmd the same as HCIDEVUP in the kernel
-#define DOWN_FW_CFG  _IOW('H', 201, int)
+#define DOWN_FW_CFG             _IOW('E', 176, int)
 #ifdef CONFIG_SCO_OVER_HCI
-#define SET_ISO_CFG  _IOW('H', 202, int)
+#define SET_ISO_CFG             _IOW('E', 177, int)
 #endif
-#define GET_USB_INFO            _IOW('H', 203, int)
-#define RESET_CONTROLLER        _IOW('H', 204, int)
+#define RESET_CONTROLLER        _IOW('E', 178, int)
+#define DWFW_CMPLT              _IOW('E', 179, int)
+
+#define GET_USB_INFO            _IOR('E', 180, int)
 
 /*  for altsettings*/
 #include <linux/fs.h>
