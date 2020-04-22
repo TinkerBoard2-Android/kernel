@@ -128,10 +128,10 @@ static patch_info fw_patch_table[] = {
 { 0x0BDA, 0xC82F, 0x8822, 0, 0, "mp_rtl8822c_fw", "rtl8822c_fw", "rtl8822c_config", NULL, 0 ,CONFIG_MAC_OFFSET_GEN_4PLUS, MAX_PATCH_SIZE_40K}, /* RTL8822CE-VS */
 { 0x0BDA, 0xC822, 0x8822, 0, 0, "mp_rtl8822c_fw", "rtl8822c_fw", "rtl8822c_config", NULL, 0 ,CONFIG_MAC_OFFSET_GEN_4PLUS, MAX_PATCH_SIZE_40K}, /* RTL8822CE */
 
-{ 0x0B05, 0x185C, 0x8822, 0, 0, "mp_rtl8822b_fw", "rtl8822b_fw", "rtl8822b_config", NULL, 0 ,CONFIG_MAC_OFFSET_GEN_3PLUS, MAX_PATCH_SIZE_24K}, /* RTL8822BE */
-{ 0x04CA, 0x4005, 0x8822, 0, 0, "mp_rtl8822c_fw", "rtl8822c_fw", "rtl8822c_config", NULL, 0 ,CONFIG_MAC_OFFSET_GEN_4PLUS, MAX_PATCH_SIZE_40K}, /* RTL8822CU */
-{ 0x13D3, 0x3548, 0x8822, 0, 0, "mp_rtl8822c_fw", "rtl8822c_fw", "rtl8822c_config", NULL, 0 ,CONFIG_MAC_OFFSET_GEN_4PLUS, MAX_PATCH_SIZE_40K}, /* RTL8822CU */
-{ 0x13D3, 0x3549, 0x8822, 0, 0, "mp_rtl8822c_fw", "rtl8822c_fw", "rtl8822c_config", NULL, 0 ,CONFIG_MAC_OFFSET_GEN_4PLUS, MAX_PATCH_SIZE_40K}, /* RTL8822CU */
+{ 0x0B05, 0x185C, 0x8822, 0, 0, "mp_rtl8822b_fw", "rtl8822bu_fw", "rtl8822bu_config", NULL, 0 ,CONFIG_MAC_OFFSET_GEN_3PLUS, MAX_PATCH_SIZE_24K}, /* RTL8822BE */
+{ 0x04CA, 0x4005, 0x8822, 0, 0, "mp_rtl8822c_fw", "rtl8822cu_fw", "rtl8822cu_config", NULL, 0 ,CONFIG_MAC_OFFSET_GEN_4PLUS, MAX_PATCH_SIZE_40K}, /* RTL8822CU */
+{ 0x13D3, 0x3548, 0x8822, 0, 0, "mp_rtl8822c_fw", "rtl8822cu_fw", "rtl8822cu_config", NULL, 0 ,CONFIG_MAC_OFFSET_GEN_4PLUS, MAX_PATCH_SIZE_40K}, /* RTL8822CU */
+{ 0x13D3, 0x3549, 0x8822, 0, 0, "mp_rtl8822c_fw", "rtl8822cu_fw", "rtl8822cu_config", NULL, 0 ,CONFIG_MAC_OFFSET_GEN_4PLUS, MAX_PATCH_SIZE_40K}, /* RTL8822CU */
 /* NOTE: must append patch entries above the null entry */
 { 0, 0, 0, 0, 0, NULL, NULL, NULL, NULL, 0, 0, 0 }
 };
