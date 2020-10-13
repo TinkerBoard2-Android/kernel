@@ -138,3 +138,19 @@
 	status = "disabled";
 };
 
+&sgm3784 {
+	status = "disabled";
+};
+
+&gsl3673 {
+	status = "disabled";
+};
+
+&gc2145 {
+	status = "disabled";
+};
+
+&ov13850 {
+	status = "disabled";
+};
+
