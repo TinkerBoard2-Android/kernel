@@ -1512,7 +1512,7 @@
 	status = "okay";
 };
 
-&hdmi_in_vopb {
+&hdmi_in_vopl {
 	status = "disabled";
 };
 
@@ -1603,7 +1603,7 @@
 
 &route_hdmi {
 	status = "okay";
-	connect = <&vopl_out_hdmi>;
+	connect = <&vopb_out_hdmi>;
 };
 
 &rkvdec {
