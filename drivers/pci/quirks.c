@@ -3349,6 +3349,14 @@ DECLARE_PCI_FIXUP_FINAL(0x1b7c, 0x0004, /* Ceton InfiniTV4 */
 DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_REALTEK, 0x8169,
 			quirk_broken_intx_masking);
 
+static void quirk_rtl_pcie_pm(struct pci_dev *dev)
+{
+	dev->no_d1d2 = 1;
+}
+
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_REALTEK, 0xc822,
+			 quirk_rtl_pcie_pm);
+
 /*
  * Intel i40e (XL710/X710) 10/20/40GbE NICs all have broken INTx masking,
  * DisINTx can be set but the interrupt status bit is non-functional.
