@@ -164,4 +164,5 @@
 	sd-uhs-sdr25;
 	sd-uhs-sdr50;
 	sd-uhs-sdr104;
+	supports-emmc;
 };
