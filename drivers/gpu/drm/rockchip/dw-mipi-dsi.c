@@ -819,7 +819,7 @@ static ssize_t dw_mipi_dsi_transfer(struct dw_mipi_dsi *dsi,
 		regmap_update_bits(dsi->regmap, DSI_VID_MODE_CFG,
 				   LP_CMD_EN, LP_CMD_EN);
 	} else {
-		regmap_update_bits(dsi->regmap, DSI_VID_MODE_CFG, LP_CMD_EN, 0);
+		//regmap_update_bits(dsi->regmap, DSI_VID_MODE_CFG, LP_CMD_EN, 0);
 		regmap_update_bits(dsi->regmap, DSI_LPCLK_CTRL,
 				   PHY_TXREQUESTCLKHS, PHY_TXREQUESTCLKHS);
 	}
@@ -985,7 +985,7 @@ static void dw_mipi_dsi_set_vid_mode(struct dw_mipi_dsi *dsi)
 	u32 val;
 
 	val = LP_HFP_EN | LP_HBP_EN | LP_VACT_EN | LP_VFP_EN | LP_VBP_EN |
-	      LP_VSA_EN;
+	      LP_VSA_EN | LP_CMD_EN ;
 
 	if (dsi->mode_flags & MIPI_DSI_MODE_VIDEO_HFP)
 		val &= ~LP_HFP_EN;
@@ -1466,6 +1466,11 @@ static int dw_mipi_dsi_dual_channel_probe(struct dw_mipi_dsi *dsi)
 	return 0;
 }
 
+#if defined(CONFIG_TINKER_MCU)
+extern int tinker_mcu_is_connected(int dsi_id);
+extern int tinker_mcu_ili9881c_is_connected(int dsi_id);
+#endif
+
 static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
 			    void *data)
 {
@@ -1474,6 +1479,15 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
 	struct drm_encoder *encoder = &dsi->encoder;
 	struct drm_connector *connector = &dsi->connector;
 	int ret;
+
+#if defined(CONFIG_TINKER_MCU)
+	if(!tinker_mcu_is_connected(dsi->id) && !tinker_mcu_ili9881c_is_connected(dsi->id)) {
+		pr_info("dsi-%d panel isn't connected\n", dsi->id);
+		return 0;
+	} else {
+		pr_info("dsi-%d panel is connected\n", dsi->id);
+	}
+#endif
 
 	ret = dw_mipi_dsi_dual_channel_probe(dsi);
 	if (ret)
