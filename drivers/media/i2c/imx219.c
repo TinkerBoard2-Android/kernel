@@ -10,6 +10,7 @@
  */
 #include <linux/clk.h>
 #include <linux/delay.h>
+#include <linux/gpio/consumer.h>
 #include <linux/i2c.h>
 #include <linux/init.h>
 #include <linux/io.h>
@@ -77,10 +78,10 @@ static const struct imx219_reg imx219_init_tab_3280_2464_21fps[] = {
 	{0x0128, 0x00},		/* DPHY_CNTRL */
 	{0x012A, 0x18},		/* EXCK_FREQ[15:8] */
 	{0x012B, 0x00},		/* EXCK_FREQ[7:0] */
-	{0x015A, 0x01},		/* INTEG TIME[15:8] */
-	{0x015B, 0xF4},		/* INTEG TIME[7:0] */
+//	{0x015A, 0x01},		/* INTEG TIME[15:8] */
+//	{0x015B, 0xF4},		/* INTEG TIME[7:0] */
 	{0x0160, 0x09},		/* FRM_LENGTH_A[15:8] */
-	{0x0161, 0xC4},		/* FRM_LENGTH_A[7:0] */
+	{0x0161, 0xD7},		/* FRM_LENGTH_A[7:0] */
 	{0x0162, 0x0D},		/* LINE_LENGTH_A[15:8] */
 	{0x0163, 0x78},		/* LINE_LENGTH_A[7:0] */
 	{0x0260, 0x09},		/* FRM_LENGTH_B[15:8] */
@@ -243,6 +244,8 @@ struct imx219 {
 	const char *module_facing;
 	const char *module_name;
 	const char *len_name;
+
+	struct gpio_desc        *enable_gpio;
 };
 
 static const struct imx219_mode supported_modes[] = {
@@ -265,7 +268,7 @@ static const struct imx219_mode supported_modes[] = {
 			.denominator = 210000,
 		},
 		.hts_def = 0x0d78 - IMX219_EXP_LINES_MARGIN,
-		.vts_def = 0x09c4,
+		.vts_def = 0x09d7,
 		.reg_list = imx219_init_tab_3280_2464_21fps,
 	},
 };
@@ -821,6 +824,27 @@ static int imx219_enum_frame_interval(struct v4l2_subdev *sd,
 	return 0;
 }
 
+static int imx219_enum_frame_sizes(struct v4l2_subdev *sd,
+	struct v4l2_subdev_pad_config *cfg,
+	struct v4l2_subdev_frame_size_enum *fse)
+{
+	struct i2c_client *client = v4l2_get_subdevdata(sd);
+	struct imx219 *priv = to_imx219(client);
+
+	if (fse->index >= priv->cfg_num)
+		return -EINVAL;
+
+	if (fse->code != MEDIA_BUS_FMT_SRGGB10_1X10)
+		return -EINVAL;
+
+	fse->min_width  = supported_modes[fse->index].width;
+	fse->max_width  = supported_modes[fse->index].width;
+	fse->max_height = supported_modes[fse->index].height;
+	fse->min_height = supported_modes[fse->index].height;
+
+	return 0;
+}
+
 /* Various V4L2 operations tables */
 static struct v4l2_subdev_video_ops imx219_subdev_video_ops = {
 	.s_stream = imx219_s_stream,
@@ -838,6 +862,7 @@ static struct v4l2_subdev_core_ops imx219_subdev_core_ops = {
 static const struct v4l2_subdev_pad_ops imx219_subdev_pad_ops = {
 	.enum_mbus_code = imx219_enum_mbus_code,
 	.enum_frame_interval = imx219_enum_frame_interval,
+	.enum_frame_size = imx219_enum_frame_sizes,
 	.set_fmt = imx219_set_fmt,
 	.get_fmt = imx219_get_fmt,
 };
@@ -1040,12 +1065,16 @@ static int imx219_probe(struct i2c_client *client,
 		return -EINVAL;
 	}
 
-	priv->clk = devm_clk_get(&client->dev, NULL);
+	priv->clk = devm_clk_get(&client->dev, "xvclk");
 	if (IS_ERR(priv->clk)) {
 		dev_info(&client->dev, "Error %ld getting clock\n",
 			 PTR_ERR(priv->clk));
 		return -EPROBE_DEFER;
 	}
+
+	priv->enable_gpio = devm_gpiod_get(dev, "enable", GPIOD_OUT_HIGH);
+	if (IS_ERR(priv->enable_gpio))
+		dev_warn(dev, "Failed to get enable_gpios\n");
 
 	/* 1920 * 1080 by default */
 	priv->cur_mode = &supported_modes[0];
@@ -1087,6 +1116,7 @@ static int imx219_probe(struct i2c_client *client,
 	if (ret < 0)
 		return ret;
 
+	dev_info(&client->dev, "%s probe done.\n", sd->name);
 	return ret;
 }
 

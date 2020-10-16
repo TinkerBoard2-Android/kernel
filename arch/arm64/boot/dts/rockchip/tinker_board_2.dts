@@ -24,34 +24,52 @@
 &i2c1 {
 	status = "okay";
 
-	/delete-node/ tc358749x@0f;
+	imx219: imx219@10 {
+		compatible = "sony,imx219";
+		status = "okay";
+		reg = <0x10>;
+		clocks = <&cru SCLK_CIF_OUT>;
+		clock-names = "xvclk";
+		pinctrl-names = "rockchip,camera_default";
+		pinctrl-0 = <&cif_clkout>;
 
-	tc35874x: tc35874x@0f {
-		status = "disabled";
-		reg = <0x0f>;
-		compatible = "toshiba,tc358749";
-		clocks = <&ext_cam_clk>;
-		clock-names = "refclk";
-		reset-gpios = <&gpio2 7 GPIO_ACTIVE_LOW>;
-		/* interrupt-parent = <&gpio2>; */
-		/* interrupts = <12 IRQ_TYPE_LEVEL_HIGH>; */
-		pinctrl-names = "default";
-		pinctrl-0 = <&tc35874x_gpios>;
+		enable-gpios = <&gpio4 RK_PA3 GPIO_ACTIVE_HIGH>;
 		rockchip,camera-module-index = <0>;
 		rockchip,camera-module-facing = "back";
-		rockchip,camera-module-name = "TC358749XBG";
-		rockchip,camera-module-lens-name = "NC";
+		rockchip,camera-module-name = "RPi_v21";
+		rockchip,camera-module-lens-name = "default";
 
 		port {
-			hdmiin_out0: endpoint {
-				remote-endpoint = <&hdmi_to_mipi_in>;
-				data-lanes = <1 2 3 4>;
-				clock-noncontinuous;
-				link-frequencies =
-					/bits/ 64 <297000000>;
+			imx219_out: endpoint {
+				remote-endpoint = <&mipi_in_ucam0>;
+				data-lanes = <1 2>;
 			};
 		};
 	};
+
+	ov5647: ov5647@36 {
+		compatible = "ovti,ov5647";
+		status = "disabled";
+		reg = <0x36>;
+		clocks = <&cru SCLK_CIF_OUT>;
+		clock-names = "xvclk";
+
+		pinctrl-names = "rockchip,camera_default";
+		pinctrl-0 = <&cif_clkout>;
+
+		enable-gpios = <&gpio4 RK_PA3 GPIO_ACTIVE_HIGH>;
+
+		rockchip,camera-module-index = <0>;
+		rockchip,camera-module-facing = "back";
+		rockchip,camera-module-name = "RPi_v13";
+		rockchip,camera-module-lens-name = "default";
+
+		port {
+			ov5647_out: endpoint {
+			};
+		};
+	};
+
 };
 
 &mipi_dphy_rx0 {
@@ -68,14 +86,8 @@
 
 			mipi_in_ucam0: endpoint@1 {
 				reg = <1>;
-				remote-endpoint = <&ucam_out0>;
+				remote-endpoint = <&imx219_out>;
 				data-lanes = <1 2>;
-			};
-
-			hdmi_to_mipi_in: endpoint@2 {
-				reg = <2>;
-				remote-endpoint = <&hdmiin_out0>;
-				data-lanes = <1 2 3 4>;
 			};
 		};
 
@@ -123,6 +135,10 @@
 };
 
 &rkisp1_1 {
+	status = "disabled";
+};
+
+&isp1_mmu {
 	status = "disabled";
 };
 
