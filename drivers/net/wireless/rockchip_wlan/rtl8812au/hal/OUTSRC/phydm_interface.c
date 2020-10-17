@@ -547,7 +547,7 @@ ODM_SetTimer(
 )
 {
 #if(DM_ODM_SUPPORT_TYPE & (ODM_AP|ODM_ADSL))
-	mod_timer(pTimer, jiffies + RTL_MILISECONDS_TO_JIFFIES(msDelay));
+	mod_timer(&ptimer->timer, jiffies + RTL_MILISECONDS_TO_JIFFIES(msDelay));
 #elif(DM_ODM_SUPPORT_TYPE & ODM_CE)
 	_set_timer(pTimer,msDelay ); //ms
 #elif(DM_ODM_SUPPORT_TYPE & ODM_WIN)
