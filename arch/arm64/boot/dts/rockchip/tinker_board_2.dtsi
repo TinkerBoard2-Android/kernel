@@ -1594,6 +1594,13 @@
 	connect = <&vopb_out_hdmi>;
 };
 
+&route_dsi{
+	status = "okay";
+	logo,uboot = "tinkerboard.bmp";
+	logo,kernel = "tinkerboard.bmp";
+	connect = <&vopl_out_dsi>;
+};
+
 &rkvdec {
 	status = "okay";
 };
