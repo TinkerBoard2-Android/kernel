@@ -202,7 +202,7 @@ typedef enum _RT_SPINLOCK_TYPE{
 
 	typedef struct rtl8192cd_priv	*prtl8192cd_priv;
 	typedef struct stat_info		STA_INFO_T,*PSTA_INFO_T;
-	typedef struct timer_list		RT_TIMER, *PRT_TIMER;
+	typedef struct rtw_timer_list		RT_TIMER, *PRT_TIMER;
 	typedef  void *				RT_TIMER_CALL_BACK;
 
 	#define _TRUE				1
@@ -266,7 +266,7 @@ typedef enum _RT_SPINLOCK_TYPE{
 		#define	ODM_ENDIAN_TYPE			ODM_ENDIAN_BIG
 	#endif
 
-	typedef struct timer_list		RT_TIMER, *PRT_TIMER;
+	typedef struct rtw_timer_list		RT_TIMER, *PRT_TIMER;
 	typedef  void *				RT_TIMER_CALL_BACK;
 	#define	STA_INFO_T			struct sta_info
 	#define	PSTA_INFO_T		struct sta_info *
