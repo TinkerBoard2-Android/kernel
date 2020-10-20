@@ -1162,7 +1162,7 @@
 };
 
 &dsi {
-	status = "disabled";
+	status = "okay";
 
 	panel@0 {
 		compatible ="simple-panel-dsi";
