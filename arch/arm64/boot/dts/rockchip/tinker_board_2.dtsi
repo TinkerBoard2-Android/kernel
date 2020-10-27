@@ -979,7 +979,7 @@
 };
 
 &pwm0 {
-	status = "okay";
+	status = "disabled";
 };
 
 &pwm2 {
@@ -1106,6 +1106,22 @@
 &usbdrd_dwc3_1 {
 	status = "okay";
 	dr_mode = "host";
+};
+
+&pinctrl {
+        pinctrl-names = "default";
+        pinctrl-0 = <&gpio_init>;
+
+        gpio_init_config {
+                gpio_init: gpio_init {
+                        rockchip,pins =
+                                <1 7 0 &pcfg_pull_none>,
+                                <1 8 0 &pcfg_pull_none>,
+                                <1 9 0 &pcfg_pull_none>,
+                                <1 10 0 &pcfg_pull_none>,
+                                <2 19 0 &pcfg_pull_none>;
+                };
+        };
 };
 
 &backlight {
@@ -1861,7 +1877,7 @@
 };
 
 &spdif {
-	status = "okay";
+	status = "disabled";
 	pinctrl-0 = <&spdif_bus>;
 	i2c-scl-rising-time-ns = <450>;
 	i2c-scl-falling-time-ns = <15>;
@@ -1869,7 +1885,7 @@
 };
 
 &i2s0 {
-	status = "okay";
+	status = "disabled";
 	rockchip,playback-channels = <8>;
 	rockchip,capture-channels = <8>;
 	#sound-dai-cells = <0>;
@@ -1901,7 +1917,6 @@
 	non-removable;
 	num-slots = <1>;
 	pinctrl-names = "default";
-	pinctrl-0 = <&sdio0_bus4 &sdio0_cmd &sdio0_clk>;
 	sd-uhs-sdr104;
 	status = "okay";
 };
@@ -2060,6 +2075,44 @@
 
 &rkvdec_mmu {
 	status = "okay";
+};
+
+&i2c6 {
+	status = "disabled";
+};
+
+&i2c7 {
+	status = "disabled";
+};
+
+&spi1 {
+	status = "disabled";
+	max-freq = <48000000>; /* spi internal clk, don't modify */
+	spi_dev@0 {
+		compatible = "rockchip,spidev";
+		reg = <0>;
+		spi-max-frequency = <48000000>;
+		spi-lsb-first;
+	};
+};
+
+&spi5 {
+	status = "disabled";
+	max-freq = <48000000>;   //spi internal clk, don't modify
+	spi_dev@0 {
+		compatible = "rockchip,spidev";
+		reg = <0>;   //chip select  0:cs0  1:cs1
+		id = <0>;
+		spi-max-frequency = <48000000>;   //spi output clock
+	};
+};
+
+&uart0 {
+	status = "disabled";
+};
+
+&uart4 {
+	status = "disabled";
 };
 
 &iep {
