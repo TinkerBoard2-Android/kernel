@@ -351,7 +351,6 @@
 			240 241 242 243 244 245 246 247
 			248 249 250 251 252 253 254 255>;
 		default-brightness-level = <200>;
-		pwms = <&pwm0 0 25000 0>;
 		status = "disabled";
 	};
 
@@ -1108,7 +1107,7 @@
 
 &pinctrl {
         pinctrl-names = "default";
-        pinctrl-0 = <&gpio_init>;
+        pinctrl-0 = <&gpio_init &test_clkout2>;
 
         gpio_init_config {
                 gpio_init: gpio_init {
@@ -1120,6 +1119,13 @@
                                 <2 19 0 &pcfg_pull_none>;
                 };
         };
+
+	testclk {
+		test_clkout2: test-clkout2 {
+			rockchip,pins =
+				<0 8 RK_FUNC_3 &pcfg_pull_none>;
+		};
+	};
 };
 
 &backlight {
@@ -2104,6 +2110,14 @@
 
 &uart4 {
 	status = "disabled";
+};
+
+&pwm1 {
+        status = "disabled";
+};
+
+&pwm3 {
+        status = "disabled";
 };
 
 &iep {
