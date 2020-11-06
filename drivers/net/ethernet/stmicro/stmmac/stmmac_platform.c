@@ -25,6 +25,7 @@
 #include <linux/of_net.h>
 #include <linux/of_device.h>
 #include <linux/of_mdio.h>
+#include <linux/of_gpio.h>
 
 #include "stmmac.h"
 #include "stmmac_platform.h"
@@ -388,6 +389,8 @@ stmmac_probe_config_dt(struct platform_device *pdev, const char **mac)
 	struct device_node *np = pdev->dev.of_node;
 	struct plat_stmmacenet_data *plat;
 	struct stmmac_dma_cfg *dma_cfg;
+	enum of_gpio_flags flags;
+	const char *wakeup_enable;
 	int rc;
 
 	plat = devm_kzalloc(&pdev->dev, sizeof(*plat), GFP_KERNEL);
@@ -396,6 +399,19 @@ stmmac_probe_config_dt(struct platform_device *pdev, const char **mac)
 
 	*mac = of_get_mac_address(np);
 	plat->interface = of_get_phy_mode(np);
+	plat->wolirq_io = of_get_named_gpio_flags(np, "wolirq-gpio", 0, &flags);
+
+	/* Get wakeup_enable */
+	if (of_property_read_string(np, "wakeup-enable", &wakeup_enable)) {
+		printk("[WOL] Fail to read wakeup-enable");
+		plat->wakeup_enable = 0;
+	} else {
+		printk("[WOL] wakeup_enable = %s", wakeup_enable);
+		if (!strcmp(wakeup_enable, "1"))
+			plat->wakeup_enable = 1;
+		else
+			plat->wakeup_enable = 0;
+	}
 
 	/* Get max speed of operation from device tree */
 	if (of_property_read_u32(np, "max-speed", &plat->max_speed))
