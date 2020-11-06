@@ -19,6 +19,26 @@
 		clock-output-names = "CLK_CAMERA_27MHZ";
 		#clock-cells = <0>;
 	};
+
+	gpio-leds {
+		compatible = "gpio-leds";
+
+		pwr-led {
+			gpios = <&gpio0 RK_PA4 GPIO_ACTIVE_HIGH>;
+			linux,default-trigger = "default-on";
+			retain-state-suspended = <1>;
+		};
+
+		act-led {
+			gpios = <&gpio0 RK_PA3 GPIO_ACTIVE_HIGH>;
+			linux,default-trigger="mmc0";
+		};
+
+		rsv-led {
+			gpios = <&gpio0 RK_PB2 GPIO_ACTIVE_HIGH>;
+			linux,default-trigger="none";
+		};
+	};
 };
 
 &i2c1 {
