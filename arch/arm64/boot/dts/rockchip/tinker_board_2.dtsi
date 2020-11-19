@@ -126,13 +126,6 @@
 		status = "okay";
 	};
 
-	hdmi_dp_sound: hdmi-dp-sound {
-		status = "disabled";
-		compatible = "rockchip,rk3399-hdmi-dp";
-		rockchip,cpu = <&i2s2>;
-		rockchip,codec = <&hdmi>, <&cdn_dp>;
-	};
-
 	firmware {
 		firmware_android: android {};
 	};
@@ -196,6 +189,21 @@
 		status = "okay";
 	};
 
+	hdmi_sound: hdmi-sound {
+		status = "disabled";
+		compatible = "simple-audio-card";
+		simple-audio-card,format = "i2s";
+		simple-audio-card,mclk-fs = <256>;
+		simple-audio-card,name = "rockchip,hdmi";
+
+		simple-audio-card,cpu {
+			sound-dai = <&i2s2>;
+		};
+		simple-audio-card,codec {
+			sound-dai = <&hdmi>;
+		};
+	};
+
 	rt5651_sound: rt5651-sound {
 		compatible = "simple-audio-card";
 		simple-audio-card,format = "i2s";
@@ -217,8 +225,8 @@
 		};
 	};
 
-	spdif-sound {
-		status = "okay";
+	spdif_sound: spdif-sound {
+		status = "disabled";
 		compatible = "simple-audio-card";
 		simple-audio-card,name = "ROCKCHIP,SPDIF";
 		simple-audio-card,cpu {
@@ -230,7 +238,7 @@
 	};
 
 	spdif_out: spdif-out {
-		status = "okay";
+		status = "disabled";
 		compatible = "linux,spdif-dit";
 		#sound-dai-cells = <0>;
 	};
@@ -1938,11 +1946,23 @@
 };
 
 &spdif {
-	status = "disabled";
+	status = "okay";
 	pinctrl-0 = <&spdif_bus>;
 	i2c-scl-rising-time-ns = <450>;
 	i2c-scl-falling-time-ns = <15>;
 	#sound-dai-cells = <0>;
+};
+
+&dp_sound {
+	status = "okay";
+};
+
+&spdif_out {
+	status = "disabled";
+};
+
+&spdif_sound {
+	status = "disabled";
 };
 
 &i2s0 {
@@ -2031,10 +2051,6 @@
 
 &hdmi_in_vopl {
 	status = "disabled";
-};
-
-&hdmi_dp_sound {
-	status = "okay";
 };
 
 &display_subsystem {
