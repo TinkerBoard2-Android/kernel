@@ -2909,11 +2909,21 @@ static int mmc_blk_probe(struct mmc_card *card)
 	dev_set_drvdata(&card->dev, md);
 
 #if defined(CONFIG_MMC_DW_ROCKCHIP) || defined(CONFIG_MMC_SDHCI_OF_ARASAN)
+	md->disk->emmc_disk = 0;
 	if (card->host->restrict_caps & RESTRICT_CARD_TYPE_EMMC) {
-		this_card = card;
-		md->disk->emmc_disk = 1;
-	} else {
-		md->disk->emmc_disk = 0;
+		if ((card->host->restrict_caps & RESTRICT_CARD_TYPE_SD) &&
+				strstr(saved_command_line, "storagemedia=sd")) {
+			/* mmc1 & SD card bootup */
+			pr_info("%s is emmc_disk1\n", mmc_card_id(card));
+			this_card = card;
+			md->disk->emmc_disk = 1;
+		} else if (!(card->host->restrict_caps & RESTRICT_CARD_TYPE_SD) &&
+				strstr(saved_command_line, "storagemedia=emmc")) {
+			/* mmc2 & emmc bootup */
+			pr_info("%s is emmc_disk2\n", mmc_card_id(card));
+			this_card = card;
+			md->disk->emmc_disk = 1;
+		}
 	}
 #endif
 
