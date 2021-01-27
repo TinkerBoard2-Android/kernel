@@ -210,7 +210,7 @@ static int fan53555_set_enable(struct regulator_dev *rdev)
 	struct fan53555_device_info *di = rdev_get_drvdata(rdev);
 
 	if (di->vsel_gpio) {
-		gpiod_set_raw_value(di->vsel_gpio, di->sleep_vsel_id);
+		gpiod_set_raw_value(di->vsel_gpio, !di->sleep_vsel_id);
 		return 0;
 	}
 
@@ -223,7 +223,7 @@ static int fan53555_set_disable(struct regulator_dev *rdev)
 	struct fan53555_device_info *di = rdev_get_drvdata(rdev);
 
 	if (di->vsel_gpio) {
-		gpiod_set_raw_value(di->vsel_gpio, !di->sleep_vsel_id);
+		gpiod_set_raw_value(di->vsel_gpio, di->sleep_vsel_id);
 		return 0;
 	}
 
@@ -239,9 +239,9 @@ static int fan53555_is_enabled(struct regulator_dev *rdev)
 
 	if (di->vsel_gpio) {
 		if (di->sleep_vsel_id)
-			return gpiod_get_raw_value(di->vsel_gpio);
-		else
 			return !gpiod_get_raw_value(di->vsel_gpio);
+		else
+			return gpiod_get_raw_value(di->vsel_gpio);
 	}
 
 	ret = regmap_read(di->regmap, di->en_reg, &val);
@@ -523,6 +523,14 @@ static int fan53555_voltages_setup_tcs(struct fan53555_device_info *di)
 
 static int fan53200_voltages_setup_fairchild(struct fan53555_device_info *di)
 {
+	if (di->sleep_vsel_id) {
+		di->sleep_reg = FAN53555_VSEL0;
+		di->vol_reg = FAN53555_VSEL1;
+	} else {
+		di->sleep_reg = FAN53555_VSEL1;
+		di->vol_reg = FAN53555_VSEL0;
+	}
+
 	/* Init voltage range and step */
 //	switch (di->chip_id) {
 //	case FAN53200_CHIP_ID_00:
@@ -649,7 +657,7 @@ static struct fan53555_platform_data *fan53555_parse_dt(struct device *dev,
 	if (!ret)
 		pdata->sleep_vsel_id = tmp;
 
-	if (!pdata->sleep_vsel_id)
+	if (pdata->sleep_vsel_id)
 		flag = GPIOD_OUT_LOW;
 	else
 		flag = GPIOD_OUT_HIGH;
@@ -673,7 +681,7 @@ static const struct of_device_id fan53555_dt_ids[] = {
 	}, {
 		.compatible = "fcs,fan53200",
 		.data = (void *)FAN53200_VENDOR_FAIRCHILD,
-	},  {
+	}, {
 		.compatible = "rockchip,rk8603",
 		.data = (void *)FAN53555_VENDOR_RK,
 	}, {
@@ -703,8 +711,6 @@ static int fan53555_regulator_probe(struct i2c_client *client,
 	unsigned int val;
 	int ret;
 
-	dev_info(&client->dev, "fan53555_regulator_probe\n");
-
 	di = devm_kzalloc(&client->dev, sizeof(struct fan53555_device_info),
 					GFP_KERNEL);
 	if (!di)
@@ -728,7 +734,6 @@ static int fan53555_regulator_probe(struct i2c_client *client,
 	if (client->dev.of_node) {
 		di->vendor =
 			(unsigned long)of_device_get_match_data(&client->dev);
-		dev_info(&client->dev, "vendor1 = %d\n", di->vendor);
 	} else {
 		/* if no ramp constraint set, get the pdata ramp_delay */
 		if (!di->regulator->constraints.ramp_delay) {
@@ -740,7 +745,6 @@ static int fan53555_regulator_probe(struct i2c_client *client,
 		}
 
 		di->vendor = id->driver_data;
-		dev_info(&client->dev, "vendor2 = %d\n", di->vendor);
 	}
 
 	di->regmap = devm_regmap_init_i2c(client, &fan53555_regmap_config);
@@ -757,7 +761,6 @@ static int fan53555_regulator_probe(struct i2c_client *client,
 		return ret;
 	}
 	di->chip_id = val & DIE_ID;
-	dev_info(&client->dev, "chip id val=0x%X, chip_id=0x%X\n", val, di->chip_id);
 	/* Get chip revision */
 	ret = regmap_read(di->regmap, FAN53555_ID2, &val);
 	if (ret < 0) {
@@ -765,7 +768,6 @@ static int fan53555_regulator_probe(struct i2c_client *client,
 		return ret;
 	}
 	di->chip_rev = val & DIE_REV;
-	dev_info(&client->dev, "chip rev val=0x%X, chip_rev=0x%X\n", val, di->chip_rev);
 	dev_info(&client->dev, "FAN53555 Option[%d] Rev[%d] Detected!\n",
 				di->chip_id, di->chip_rev);
 	/* Device init */
