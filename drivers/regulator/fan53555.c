@@ -531,6 +531,9 @@ static int fan53200_voltages_setup_fairchild(struct fan53555_device_info *di)
 		di->vol_reg = FAN53555_VSEL0;
 	}
 
+	di->en_reg = di->vol_reg;
+	di->sleep_en_reg = di->sleep_reg;
+
 	/* Init voltage range and step */
 //	switch (di->chip_id) {
 //	case FAN53200_CHIP_ID_00:
