@@ -971,6 +971,72 @@
 &i2c8 {
 	status = "okay";
 
+	dsi_lvds_bridge: sn65dsi84@2c {
+		compatible = "sn65dsi84";
+		status = "okay";
+		reg = <0x2c>;
+
+		lvds-clk-rate = <72000000>;
+		lvds-format = <2>;
+		lvds-bpp = <24>;
+		dsi-lanes = <4>;//u-boot
+		sync_delay = <33>;
+		dual-link;
+		//test-pattern;
+
+		t1=<0>;
+		t2=<1>;
+		t3=<500>;
+		t4=<200>;
+		t5=<1>;
+		t6=<0>;
+		t7=<1000>;
+
+		pinctrl-names = "default";
+		pinctrl-0 =  <&pinctrl_sn65dsi84_en &pinctrl_lvds_vdd_en &pinctrl_sn65dsi84_irq  &pinctrl_pwr_source>;//<&pinctrl_lvds_hdmi_sel>
+
+		/*lvds_hdmi_sel-gpios = <&5 23 GPIO_ACTIVE_HIGH>;*/
+		EN-gpios = <&gpio1 RK_PA7 GPIO_ACTIVE_HIGH>;
+		lvds_vdd_en-gpios = <&gpio1 RK_PB1 GPIO_ACTIVE_HIGH>;
+		dsi84_irq-gpios = <&gpio1 RK_PB2 GPIO_ACTIVE_HIGH>;
+		pwr_source-gpios = <&gpio0 RK_PA6 GPIO_ACTIVE_HIGH>;
+	};
+
+	dsi_edp_bridge: sn65dsi86@2d {
+		compatible = "sn65dsi86";
+		status = "okay";
+		reg = <0x2d>;
+
+		dsi-lanes = <4>;//u-boot
+		data-lanes-size = <2>;//u-boot
+		bpc=<8>;//u-boot
+		data-lanes = <0 1>;
+		lane-polarities = <0 0 0 0>;
+
+		t1=<0>;
+		t2=<0>;
+		t3=<200>;
+		t4=<20>;
+		t5=<0>;
+		t6=<0>;
+		t7=<0>;
+		t8=<100>;
+		t12= <500>;
+		t14= <15>;//Backlight node:enable_delay = <15>;
+		t15 = <15>;//Backlight node:post-pwm-on-delay-ms = <15>;
+		t16= <15>;//Backlight node:pwm-off-delay-ms = <15>;
+		t17 = <15>;//Backlight node:disable_delay = <15>;
+
+		pinctrl-names = "default";
+		pinctrl-0 =  <&pinctrl_sn65dsi84_en>, <&pinctrl_lvds_vdd_en>, <&pinctrl_sn65dsi84_irq>, <&pinctrl_pwr_source>;//<&pinctrl_lvds_bl_en>;
+
+		EN-gpios = <&gpio1 RK_PA7 GPIO_ACTIVE_HIGH>;
+		edp_vdd_en-gpios = <&gpio1 RK_PB1 GPIO_ACTIVE_HIGH>;
+		//dsi86_vbl_en-gpios = <&gpio1 RK_PB0 GPIO_ACTIVE_HIGH>;
+		dsi86_irq-gpios = <&gpio1 RK_PB2 GPIO_ACTIVE_HIGH>;
+		pwr_source-gpios = <&gpio0 RK_PA6 GPIO_ACTIVE_HIGH>;
+	};
+
 	tinker_mcu: tinker_mcu@45 {
 		compatible = "tinker_mcu";
 		reg = <0x45>;
@@ -1138,13 +1204,35 @@
         gpio_init_config {
                 gpio_init: gpio_init {
                         rockchip,pins =
-                                <1 7 0 &pcfg_pull_none>,
-                                <1 8 0 &pcfg_pull_none>,
-                                <1 9 0 &pcfg_pull_none>,
-                                <1 10 0 &pcfg_pull_none>,
                                 <2 19 0 &pcfg_pull_none>;
                 };
         };
+
+	mipi_to_lvds {
+		/*pinctrl_lvds_hdmi_sel: lvds_hdmi_sel {
+			rockchip,pins = <0 5 RK_FUNC_GPIO  &pcfg_pull_none>;
+		};*/
+
+		pinctrl_sn65dsi84_irq: sn65dsi84_irq{
+			rockchip,pins = <1 RK_PB2 RK_FUNC_GPIO  &pcfg_pull_none>;
+		};
+
+		pinctrl_lvds_bl_en: lvds_bl_en {
+			rockchip,pins = <1 RK_PB0 RK_FUNC_GPIO  &pcfg_pull_none>;
+		};
+
+		pinctrl_sn65dsi84_en: sn65dsi84_en {
+			rockchip,pins = <1 RK_PA7 RK_FUNC_GPIO   &pcfg_pull_none>;
+		};
+
+		pinctrl_lvds_vdd_en: lvds_vdd_en {
+			rockchip,pins = <1 RK_PB1 RK_FUNC_GPIO  &pcfg_pull_none>;
+		};
+
+		pinctrl_pwr_source: pwr_source {
+			rockchip,pins = <0 RK_PA6 RK_FUNC_GPIO  &pcfg_pull_none>;
+		};
+	 };
 
 	testclk {
 		test_clkout2: test-clkout2 {
@@ -1207,12 +1295,75 @@
 	status = "okay";
 };
 
+&pwm0 {
+	status = "okay";
+};
+
+&backlight {
+		status = "okay";
+		compatible = "pwm-backlight";
+		pwms = <&pwm0 0 400000 0>;//f=2500 t=400,000ns
+		brightness-levels = <
+				0    255 254 253 252 251 250 249
+				248 247 246 245 244 243 242 241
+				240 239 238 237 236 235 234 233
+				231 231 230 229 228 227 226 225
+				224 223 222 221 220 219 218 217
+				216 215 214 213 212 211 210 209
+				208 207 206 205 204 203 202 201
+				200 199 198 197 196 195 194 193
+				192 191 190 189 188 187 186 185
+				184 183 182 181 180 179 178 177
+				176 175 174 173 172 171 170 169
+				168 167 166 165 164 163 162 161
+				160 159 158 157 156 155 154 153
+				152 151 150 149 148 147 146 145
+				144 143 142 141 140 139 138 137
+				136 135 134 133 132 131 130 129
+				128 127 126 125 124 123 122 121
+				120 119 118 117 116 115 114 113
+				112 111 110 109 108 107 106 105
+				104 103 102 101 100 99 98 97
+				96 95 94 93 92 91 90 89
+				88 87 86 85 84 83 82 81
+				80 79 78 77 76 75 74 73
+				72 71 70 69 68 67 66 65
+				64 63 62 61 60 59 58 57
+				56 55 54 53 52 51 50 49
+				48 47 46 45 44 43 42 41
+				40 39 38 37 36 35 34 33
+				32 31 30 29 28 27 26 25
+				24 23 22 21 20 19 18 17
+				16 15 14 13 12 11 10 9
+				8 7 6 5 4 3 2 1
+		           >;
+		default-brightness-level = <200>;
+		minimal-brightness-level = <26>;
+		soc_enablekl-gpios = <&gpio1 RK_PB0 GPIO_ACTIVE_HIGH>;
+		enable_delay = <15>;//EDP T14,min 10
+		post-pwm-on-delay-ms = <15>;//EDP T15,min 10ms, Backlight node:post-pwm-on-delay-ms = <15>;
+		pwm-off-delay-ms = <15>;//EDP T16,min 10ms, Backlight node:pwm-off-delay-ms = <15>;
+		disable_delay = <15>;//EDP T17,min 10
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_lvds_bl_en>;
+};
+
 &dsi {
 	status = "okay";
 
 	panel@0 {
 		compatible ="simple-panel-dsi";
 		reg = <0>;
+
+		backlight = <&backlight>;
+
+		width-mm = <476>;
+		height-mm = <267>;
+		bpc=<8>;
+		bus-format = <0x100a>;//<MEDIA_BUS_FMT_RGB888_1X24>;
+		dsi,flags = <0x3>;
+		dsi,format = <0>;//MIPI_DSI_FMT_RGB888:
+		dsi,lanes = <4>;
 
 		rpi-init-sequence = [
 				29 00 06 10 02 03 00 00 00
@@ -1607,6 +1758,42 @@
 				hsync-active = <0>;
 				vsync-active = <0>;
 				de-active = <0>;
+				pixelclk-active = <0>;
+			};
+		};
+
+		display-timings {
+			native-mode = <&timing84>;
+
+			timing84: timing84  {
+				clock-frequency = <144000000>;
+				hactive = <1920>;
+				vactive = <1080>;
+				hfront-porch = <96>;
+				hback-porch = <96>;
+				hsync-len = <64>;
+				vfront-porch = <8>;
+				vsync-len = <4>;
+				vback-porch = <8>;
+				hsync-active = <0>;
+				vsync-active = <0>;
+				de-active = <1>;
+				pixelclk-active = <0>;
+			};
+
+			timing86: timing86  {
+				clock-frequency = <142000000>;
+				hactive = <1920>;
+				vactive = <1080>;
+				hfront-porch = <108>;
+				hsync-len = <48>;
+				hback-porch = <24>;
+				vfront-porch = <10>;
+				vsync-len = <10>;
+				vback-porch = <26>;
+				hsync-active = <0>;
+				vsync-active = <0>;
+				de-active = <1>;
 				pixelclk-active = <0>;
 			};
 		};
