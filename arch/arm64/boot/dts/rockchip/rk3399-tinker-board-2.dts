@@ -126,3 +126,14 @@
 	status = "disabled";
 };
 
+&edp {
+	status = "disabled";
+};
+
+&route_edp {
+	status = "disabled";
+};
+
+&dmc {
+	status = "disabled";
+};
