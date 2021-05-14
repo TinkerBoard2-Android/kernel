@@ -142,3 +142,27 @@
 	vbus-5v-gpios = <&gpio1 RK_PA3 GPIO_ACTIVE_HIGH>;
 	status = "okay";
 };
+
+&sgm3784 {
+	status = "disabled";
+};
+
+&gsl3673 {
+	status = "disabled";
+};
+
+&gc2145 {
+	status = "disabled";
+};
+
+&ov13850 {
+	status = "disabled";
+};
+
+&mpu6500_acc {
+	status = "disabled";
+};
+
+&mpu6500_gyro {
+	status = "disabled";
+};
