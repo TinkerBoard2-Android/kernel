@@ -166,3 +166,10 @@
 &mpu6500_gyro {
 	status = "disabled";
 };
+
+&sdmmc {
+	sd-uhs-sdr12;
+	sd-uhs-sdr25;
+	sd-uhs-sdr50;
+	sd-uhs-sdr104;
+};
