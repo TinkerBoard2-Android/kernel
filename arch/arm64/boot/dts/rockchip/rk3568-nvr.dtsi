@@ -189,6 +189,10 @@
 	/delete-node/ opp-1992000000;
 };
 
+&CPU_SLEEP {
+	status = "disabled";
+};
+
 &dsi0_in_vp0 {
 	status = "disabled";
 };
@@ -254,6 +258,7 @@
 		regulator-name = "vdd_cpu";
 		regulator-min-microvolt = <712500>;
 		regulator-max-microvolt = <1390000>;
+		regulator-init-microvolt = <900000>;
 		regulator-ramp-delay = <2300>;
 		fcs,suspend-voltage-selector = <1>;
 		regulator-boot-on;
@@ -343,14 +348,17 @@
 };
 
 &rkvdec {
-	/delete-property/ rockchip,sram;
-	/delete-property/ rockchip,rcb-iova;
-	rockchip,default-max-load = <100>;
+	rockchip,disable-auto-freq;
+	assigned-clock-rates = <396000000>, <396000000>, <396000000>, <600000000>;
 	status = "okay";
 };
 
 &rkvdec_mmu {
 	status = "okay";
+};
+
+&rkvdec_sram {
+	reg = <0x0 0x10000>;
 };
 
 &rkvenc {
@@ -384,6 +392,11 @@
 
 &spdif_8ch {
 	status = "okay";
+};
+
+&sram {
+	reg = <0x0 0xfdcc0000 0x0 0x10000>;
+	ranges = <0x0 0x0 0xfdcc0000 0x10000>;
 };
 
 &tsadc {

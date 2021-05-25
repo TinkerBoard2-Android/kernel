@@ -634,17 +634,7 @@ static void rkisp_buf_queue(struct vb2_buffer *vb)
 		 stream->id, ispbuf->buff_addr[0]);
 
 	spin_lock_irqsave(&stream->vbq_lock, lock_flags);
-
-	/* XXX: replace dummy to speed up  */
-	if (stream->streaming &&
-	    !stream->next_buf &&
-	    !stream->interlaced &&
-	    atomic_read(&stream->ispdev->isp_sdev.frm_sync_seq) == 0) {
-		stream->next_buf = ispbuf;
-		stream->ops->update_mi(stream);
-	} else {
-		list_add_tail(&ispbuf->queue, &stream->buf_queue);
-	}
+	list_add_tail(&ispbuf->queue, &stream->buf_queue);
 	spin_unlock_irqrestore(&stream->vbq_lock, lock_flags);
 }
 
@@ -863,6 +853,7 @@ static int rkisp_init_vb2_queue(struct vb2_queue *q,
 	q->allow_cache_hints = 1;
 	if (stream->ispdev->hw_dev->is_dma_contig)
 		q->dma_attrs = DMA_ATTR_FORCE_CONTIGUOUS;
+	q->gfp_flags = GFP_DMA32;
 	return vb2_queue_init(q);
 }
 

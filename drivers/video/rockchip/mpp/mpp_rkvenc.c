@@ -746,7 +746,7 @@ static int rkvenc_dump_session(struct mpp_session *session, struct seq_file *seq
 	}
 	seq_puts(seq, "\n");
 	/* item data*/
-	seq_printf(seq, "|%p|", session);
+	seq_printf(seq, "|%8p|", session);
 	seq_printf(seq, "%8s|", mpp_device_name[session->device_type]);
 	for (i = ENC_INFO_BASE; i < ENC_INFO_BUTT; i++) {
 		u32 flag = priv->codec_info[i].flag;
@@ -1112,7 +1112,7 @@ static void rkvenc_iommu_handle_work(struct work_struct *work_s)
 	mpp_debug_enter();
 
 	/* avoid another page fault occur after page fault */
-	down_write(&mpp->iommu_info->rw_sem);
+	mpp_iommu_down_write(mpp->iommu_info);
 
 	if (enc->aux_iova != -1) {
 		iommu_unmap(mpp->iommu_info->domain, enc->aux_iova, IOMMU_PAGE_SIZE);
@@ -1129,7 +1129,7 @@ static void rkvenc_iommu_handle_work(struct work_struct *work_s)
 		enc->aux_iova = page_iova;
 
 	rk_iommu_unmask_irq(mpp->dev);
-	up_write(&mpp->iommu_info->rw_sem);
+	mpp_iommu_up_write(mpp->iommu_info);
 
 	mpp_debug_leave();
 }

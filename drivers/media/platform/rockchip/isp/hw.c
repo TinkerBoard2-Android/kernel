@@ -41,49 +41,52 @@ struct isp_irqs_data {
 /* using default value if reg no write for multi device */
 static void default_sw_reg_flag(struct rkisp_device *dev)
 {
-	u32 reg[] = {
-		CTRL_VI_ISP_PATH,
-		IMG_EFF_CTRL,
-		SUPER_IMP_CTRL,
-		ISP_FLASH_CMD,
-		ISP_SHUTTER_CTRL,
-		ISP_CCM_CTRL,
-		CPROC_CTRL,
-		DUAL_CROP_CTRL,
-		ISP_GAMMA_OUT_CTRL,
-		ISP_GAMMA_OUT_CTRL,
-		ISP_LSC_CTRL,
-		ISP_DEBAYER_CONTROL,
-		ISP_WDR_CTRL,
-		ISP_GIC_CONTROL,
-		ISP_BLS_CTRL,
-		ISP_DPCC0_MODE,
-		ISP_DPCC1_MODE,
-		ISP_DPCC2_MODE,
-		ISP_HDRMGE_CTRL,
-		ISP_HDRTMO_CTRL,
-		ISP_RAWNR_CTRL,
-		ISP_LDCH_STS,
-		ISP_DHAZ_CTRL,
-		ISP_3DLUT_CTRL,
-		ISP_GAIN_CTRL,
-		ISP_AFM_CTRL,
-		ISP_HIST_HIST_CTRL,
-		RAWAE_BIG1_BASE,
-		RAWAE_BIG2_BASE,
-		RAWAE_BIG3_BASE,
-		ISP_RAWAE_LITE_CTRL,
-		ISP_RAWHIST_LITE_CTRL,
-		ISP_RAWHIST_BIG1_BASE,
-		ISP_RAWHIST_BIG2_BASE,
-		ISP_RAWHIST_BIG3_BASE,
-		ISP_YUVAE_CTRL,
-		ISP_RAWAF_CTRL,
-		ISP_RAWAWB_CTRL,
+	u32 v20_reg[] = {
+		CTRL_VI_ISP_PATH, IMG_EFF_CTRL, ISP_CCM_CTRL,
+		CPROC_CTRL, DUAL_CROP_CTRL, ISP_GAMMA_OUT_CTRL,
+		ISP_LSC_CTRL, ISP_DEBAYER_CONTROL, ISP_WDR_CTRL,
+		ISP_GIC_CONTROL, ISP_BLS_CTRL, ISP_DPCC0_MODE,
+		ISP_DPCC1_MODE, ISP_DPCC2_MODE, ISP_HDRMGE_CTRL,
+		ISP_HDRTMO_CTRL, ISP_RAWNR_CTRL, ISP_LDCH_STS,
+		ISP_DHAZ_CTRL, ISP_3DLUT_CTRL, ISP_GAIN_CTRL,
+		ISP_AFM_CTRL, ISP_HIST_HIST_CTRL, RAWAE_BIG1_BASE,
+		RAWAE_BIG2_BASE, RAWAE_BIG3_BASE, ISP_RAWAE_LITE_CTRL,
+		ISP_RAWHIST_LITE_CTRL, ISP_RAWHIST_BIG1_BASE,
+		ISP_RAWHIST_BIG2_BASE, ISP_RAWHIST_BIG3_BASE,
+		ISP_YUVAE_CTRL, ISP_RAWAF_CTRL, ISP_RAWAWB_CTRL,
 	};
-	u32 i, *flag;
+	u32 v21_reg[] = {
+		CTRL_VI_ISP_PATH, IMG_EFF_CTRL, ISP_CCM_CTRL,
+		CPROC_CTRL, DUAL_CROP_CTRL, ISP_GAMMA_OUT_CTRL,
+		SELF_RESIZE_CTRL, MAIN_RESIZE_CTRL, ISP_LSC_CTRL,
+		ISP_DEBAYER_CONTROL, ISP21_YNR_GLOBAL_CTRL,
+		ISP21_CNR_CTRL, ISP21_SHARP_SHARP_EN, ISP_GIC_CONTROL,
+		ISP_BLS_CTRL, ISP_DPCC0_MODE, ISP_DPCC1_MODE,
+		ISP_HDRMGE_CTRL, ISP21_DRC_CTRL0, ISP21_BAYNR_CTRL,
+		ISP21_BAY3D_CTRL, ISP_LDCH_STS, ISP21_DHAZ_CTRL,
+		ISP_3DLUT_CTRL, ISP_AFM_CTRL, ISP_HIST_HIST_CTRL,
+		RAWAE_BIG1_BASE, RAWAE_BIG2_BASE, RAWAE_BIG3_BASE,
+		ISP_RAWAE_LITE_CTRL, ISP_RAWHIST_LITE_CTRL,
+		ISP_RAWHIST_BIG1_BASE, ISP_RAWHIST_BIG2_BASE,
+		ISP_RAWHIST_BIG3_BASE, ISP_YUVAE_CTRL, ISP_RAWAF_CTRL,
+		ISP21_RAWAWB_CTRL,
+	};
+	u32 i, *flag, *reg, size;
 
-	for (i = 0; i < ARRAY_SIZE(reg); i++) {
+	switch (dev->isp_ver) {
+	case ISP_V20:
+		reg = v20_reg;
+		size = ARRAY_SIZE(v20_reg);
+		break;
+	case ISP_V21:
+		reg = v21_reg;
+		size = ARRAY_SIZE(v21_reg);
+		break;
+	default:
+		return;
+	}
+
+	for (i = 0; i < size; i++) {
 		flag = dev->sw_base_addr + reg[i] + RKISP_ISP_SW_REG_SIZE;
 		*flag = SW_REG_CACHE;
 	}
@@ -517,10 +520,21 @@ static inline bool is_iommu_enable(struct device *dev)
 	return true;
 }
 
-void rkisp_soft_reset(struct rkisp_hw_dev *dev)
+void rkisp_soft_reset(struct rkisp_hw_dev *dev, bool is_secure)
 {
 	void __iomem *base = dev->base_addr;
 	struct iommu_domain *domain = iommu_get_domain_for_dev(dev->dev);
+
+	if (domain)
+		iommu_detach_device(domain, dev->dev);
+
+	if (is_secure) {
+		/* if isp working, cru reset isn't secure.
+		 * isp soft reset first to protect isp reset.
+		 */
+		writel(0xffff, base + CIF_IRCL);
+		udelay(10);
+	}
 
 	if (dev->reset) {
 		reset_control_assert(dev->reset);
@@ -528,17 +542,16 @@ void rkisp_soft_reset(struct rkisp_hw_dev *dev)
 		reset_control_deassert(dev->reset);
 		udelay(10);
 	}
-	/* reset for Dehaze */
-	writel(CIF_ISP_CTRL_ISP_MODE_BAYER_ITU601, base + CIF_ISP_CTRL);
-	writel(0xffff, base + CIF_IRCL);
-	udelay(10);
 
-	if (domain) {
-#ifdef CONFIG_IOMMU_API
-		domain->ops->detach_dev(domain, dev->dev);
-		domain->ops->attach_dev(domain, dev->dev);
-#endif
+	if (dev->isp_ver == ISP_V20) {
+		/* reset for Dehaze */
+		writel(CIF_ISP_CTRL_ISP_MODE_BAYER_ITU601, base + CIF_ISP_CTRL);
+		writel(0xffff, base + CIF_IRCL);
+		udelay(10);
 	}
+
+	if (domain)
+		iommu_attach_device(domain, dev->dev);
 }
 
 static void isp_config_clk(struct rkisp_hw_dev *dev, int on)
@@ -606,7 +619,7 @@ static int enable_sys_clk(struct rkisp_hw_dev *dev)
 
 	rkisp_set_clk_rate(dev->clks[0],
 			   dev->clk_rate_tbl[0].clk_rate * 1000000UL);
-	rkisp_soft_reset(dev);
+	rkisp_soft_reset(dev, false);
 	isp_config_clk(dev, true);
 
 	if (dev->isp_ver == ISP_V12 || dev->isp_ver == ISP_V13) {
@@ -647,7 +660,12 @@ static int rkisp_hw_probe(struct platform_device *pdev)
 	hw_dev->dev = dev;
 	hw_dev->is_thunderboot = IS_ENABLED(CONFIG_VIDEO_ROCKCHIP_THUNDER_BOOT_ISP);
 	dev_info(dev, "is_thunderboot: %d\n", hw_dev->is_thunderboot);
-
+	hw_dev->max_in.w = 0;
+	hw_dev->max_in.h = 0;
+	hw_dev->max_in.fps = 0;
+	of_property_read_u32_array(node, "max-input", &hw_dev->max_in.w, 3);
+	dev_info(dev, "max input:%dx%d@%dfps\n",
+		 hw_dev->max_in.w, hw_dev->max_in.h, hw_dev->max_in.fps);
 	hw_dev->grf = syscon_regmap_lookup_by_phandle(node, "rockchip,grf");
 	if (IS_ERR(hw_dev->grf))
 		dev_warn(dev, "Missing rockchip,grf property\n");
@@ -670,6 +688,8 @@ static int rkisp_hw_probe(struct platform_device *pdev)
 		ret = PTR_ERR(hw_dev->base_addr);
 		goto err;
 	}
+
+	rkisp_monitor = device_property_read_bool(dev, "rockchip,restart-monitor-en");
 
 	match_data = match->data;
 	hw_dev->mipi_irq = -1;
@@ -712,6 +732,7 @@ static int rkisp_hw_probe(struct platform_device *pdev)
 	spin_lock_init(&hw_dev->buf_lock);
 	INIT_LIST_HEAD(&hw_dev->list);
 	INIT_LIST_HEAD(&hw_dev->rpt_list);
+	hw_dev->buf_init_cnt = 0;
 	hw_dev->is_idle = true;
 	hw_dev->is_single = true;
 	hw_dev->is_mi_update = false;
@@ -735,7 +756,7 @@ static int rkisp_hw_probe(struct platform_device *pdev)
 
 	pm_runtime_enable(dev);
 
-	return platform_driver_register(&rkisp_plat_drv);
+	return 0;
 err:
 	return ret;
 }
@@ -786,6 +807,7 @@ static int __maybe_unused rkisp_runtime_resume(struct device *dev)
 		memcpy_fromio(buf, base, RKISP_ISP_SW_REG_SIZE);
 		default_sw_reg_flag(hw_dev->isp[i]);
 	}
+	hw_dev->monitor.is_en = rkisp_monitor;
 	return 0;
 }
 
@@ -807,18 +829,18 @@ static struct platform_driver rkisp_hw_drv = {
 	.shutdown = rkisp_hw_shutdown,
 };
 
-#if IS_BUILTIN(CONFIG_VIDEO_ROCKCHIP_ISP) && IS_BUILTIN(CONFIG_VIDEO_ROCKCHIP_ISPP)
 static int __init rkisp_hw_drv_init(void)
 {
 	int ret;
 
 	ret = platform_driver_register(&rkisp_hw_drv);
-	if (ret)
-		return ret;
-	return rkispp_hw_drv_init();
+	if (!ret)
+		ret = platform_driver_register(&rkisp_plat_drv);
+#if IS_BUILTIN(CONFIG_VIDEO_ROCKCHIP_ISP) && IS_BUILTIN(CONFIG_VIDEO_ROCKCHIP_ISPP)
+	if (!ret)
+		ret = rkispp_hw_drv_init();
+#endif
+	return ret;
 }
 
 module_init(rkisp_hw_drv_init);
-#else
-module_platform_driver(rkisp_hw_drv);
-#endif

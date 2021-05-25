@@ -21,7 +21,7 @@
 #include <linux/moduleparam.h>
 #include <linux/slab.h>
 #include <linux/proc_fs.h>
-#include <asm/uaccess.h>
+#include <linux/uaccess.h>
 #include <linux/errno.h>
 #ifdef CONFIG_DEBUG_FS
 #include <linux/debugfs.h>
@@ -30,7 +30,7 @@
 #include "ssv_cfg.h"
 #include <linux/fs.h>
 #include <asm/segment.h>
-#include <asm/uaccess.h>
+#include <linux/uaccess.h>
 #include <linux/buffer_head.h>
 #include <linux/ctype.h>
 MODULE_AUTHOR("iComm Semiconductor Co., Ltd");
@@ -178,7 +178,7 @@ void sta_cfg_set(char *stacfgpath)
   memset(cfg_cmd, '\0', sizeof(cfg_cmd));
   memset(cfg_value, '\0', sizeof(cfg_value));
   fs = get_fs();
-  set_fs(get_ds());
+  set_fs(KERNEL_DS);
   read_len = read_line(fp, buf, MAX_CHARS_PER_LINE);
   set_fs(fs);
   sscanf(buf, "%s = %s", cfg_cmd, cfg_value);

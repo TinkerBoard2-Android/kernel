@@ -172,8 +172,7 @@ static int dwc3_gadget_resize_tx_fifos(struct dwc3 *dwc)
 	 * during controller transfer data, it may cause controller
 	 * run into abnormal and unrecoverable state.
 	 */
-	if (!dwc->needs_fifo_resize || dwc->fifo_resize_status ||
-	    dwc->gadget.speed > USB_SPEED_HIGH)
+	if (!dwc->needs_fifo_resize || dwc->fifo_resize_status)
 		return 0;
 
 	num_in_eps = DWC3_NUM_IN_EPS(&dwc->hwparams);
@@ -208,7 +207,10 @@ static int dwc3_gadget_resize_tx_fifos(struct dwc3 *dwc)
 			}
 
 			mult = 1;
-			maxpacket = 64;
+			if (dwc->gadget.speed <= USB_SPEED_HIGH)
+				maxpacket = 64;
+			else
+				maxpacket = 512;
 			break;
 		case USB_ENDPOINT_XFER_ISOC:
 			if (!dep->endpoint.caps.type_iso) {
@@ -222,9 +224,15 @@ static int dwc3_gadget_resize_tx_fifos(struct dwc3 *dwc)
 			 * to get better performance and more compliance
 			 * with bus latency.
 			 */
-			mult = dep->endpoint.mult;
-			mult = mult > 0 ? mult * 2 : 3;
 			maxpacket = dep->endpoint.maxpacket;
+			if (dwc->gadget.speed <= USB_SPEED_HIGH)
+				mult = dep->endpoint.mult;
+			else
+				mult = dep->endpoint.mult *
+				       dep->endpoint.maxburst;
+			mult = mult > 0 ? mult * 2 : 3;
+			if (mult > 6)
+				mult = 6;
 			break;
 		case USB_ENDPOINT_XFER_BULK:
 			if (!dep->endpoint.caps.type_bulk) {
@@ -238,7 +246,16 @@ static int dwc3_gadget_resize_tx_fifos(struct dwc3 *dwc)
 			 * better transmission performance.
 			 */
 			mult = 3;
-			maxpacket = 512;
+			if (dwc->gadget.speed <= USB_SPEED_HIGH) {
+				maxpacket = 512;
+			} else {
+				if (dep->endpoint.maxburst > mult) {
+					mult = dep->endpoint.maxburst;
+					if (mult > 6)
+						mult = 6;
+				}
+				maxpacket = 1024;
+			}
 			break;
 		case USB_ENDPOINT_XFER_INT:
 			/* Bulk endpoints handle interrupt transfers. */
@@ -2001,6 +2018,7 @@ static int __dwc3_gadget_wakeup(struct dwc3 *dwc)
 	link_state = DWC3_DSTS_USBLNKST(reg);
 
 	switch (link_state) {
+	case DWC3_LINK_STATE_U0:
 	case DWC3_LINK_STATE_RESET:
 	case DWC3_LINK_STATE_RX_DET:	/* in HS, means Early Suspend */
 	case DWC3_LINK_STATE_U3:	/* in HS, means SUSPEND */
@@ -2008,6 +2026,15 @@ static int __dwc3_gadget_wakeup(struct dwc3 *dwc)
 		break;
 	default:
 		return -EINVAL;
+	}
+
+	/*
+	 * dwc3 gadget wakeup from host resume signal
+	 * when the whole system enter suspend.
+	 */
+	if (link_state == DWC3_LINK_STATE_U0) {
+		dwc->link_state = link_state;
+		return 0;
 	}
 
 	ret = dwc3_gadget_set_link_state(dwc, DWC3_LINK_STATE_RECOV);
@@ -2145,7 +2172,7 @@ static int dwc3_gadget_pullup(struct usb_gadget *g, int is_on)
 	return ret;
 }
 
-static void dwc3_gadget_enable_irq(struct dwc3 *dwc)
+void dwc3_gadget_enable_irq(struct dwc3 *dwc)
 {
 	u32			reg;
 
@@ -2162,10 +2189,13 @@ static void dwc3_gadget_enable_irq(struct dwc3 *dwc)
 	if (dwc->revision < DWC3_REVISION_250A)
 		reg |= DWC3_DEVTEN_ULSTCNGEN;
 
+	if (dwc->uwk_en)
+		reg |= DWC3_DEVTEN_EOPFEN;
+
 	dwc3_writel(dwc->regs, DWC3_DEVTEN, reg);
 }
 
-static void dwc3_gadget_disable_irq(struct dwc3 *dwc)
+void dwc3_gadget_disable_irq(struct dwc3 *dwc)
 {
 	/* mask all interrupts */
 	dwc3_writel(dwc->regs, DWC3_DEVTEN, 0x00);
@@ -3296,18 +3326,21 @@ static void dwc3_gadget_conndone_interrupt(struct dwc3 *dwc)
 	 */
 }
 
-static void dwc3_gadget_wakeup_interrupt(struct dwc3 *dwc)
+static void dwc3_gadget_wakeup_interrupt(struct dwc3 *dwc, unsigned int evtinfo)
 {
+	enum dwc3_link_state next = evtinfo & DWC3_LINK_STATE_MASK;
 	/*
 	 * TODO take core out of low power mode when that's
 	 * implemented.
 	 */
 
-	if (dwc->gadget_driver && dwc->gadget_driver->resume) {
+	if (dwc->gadget_driver && dwc->gadget_driver->resume && dwc->uwk_en) {
 		spin_unlock(&dwc->lock);
 		dwc->gadget_driver->resume(&dwc->gadget);
 		spin_lock(&dwc->lock);
 	}
+
+	dwc->link_state = next;
 }
 
 static void dwc3_gadget_linksts_change_interrupt(struct dwc3 *dwc,
@@ -3413,7 +3446,8 @@ static void dwc3_gadget_suspend_interrupt(struct dwc3 *dwc,
 {
 	enum dwc3_link_state next = evtinfo & DWC3_LINK_STATE_MASK;
 
-	if (dwc->link_state != next && next == DWC3_LINK_STATE_U3)
+	if (dwc->link_state != next && next == DWC3_LINK_STATE_U3 &&
+	    dwc->uwk_en)
 		dwc3_suspend_gadget(dwc);
 
 	dwc->link_state = next;
@@ -3459,8 +3493,8 @@ static void dwc3_gadget_interrupt(struct dwc3 *dwc,
 		dwc3_gadget_conndone_interrupt(dwc);
 		break;
 	case DWC3_DEVICE_EVENT_WAKEUP:
-		dev_info(dwc->dev, "device wakeup\n");
-		dwc3_gadget_wakeup_interrupt(dwc);
+		dev_dbg(dwc->dev, "device wakeup\n");
+		dwc3_gadget_wakeup_interrupt(dwc, event->event_info);
 		break;
 	case DWC3_DEVICE_EVENT_HIBER_REQ:
 		if (dev_WARN_ONCE(dwc->dev, !dwc->has_hibernation,
@@ -3479,7 +3513,7 @@ static void dwc3_gadget_interrupt(struct dwc3 *dwc,
 			 * Ignore suspend event until the gadget enters into
 			 * USB_STATE_CONFIGURED state.
 			 */
-			dev_info(dwc->dev, "device suspend\n");
+			dev_dbg(dwc->dev, "device suspend\n");
 			if (dwc->gadget.state >= USB_STATE_CONFIGURED)
 				dwc3_gadget_suspend_interrupt(dwc,
 						event->event_info);

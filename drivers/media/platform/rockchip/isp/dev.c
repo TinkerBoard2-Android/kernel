@@ -59,6 +59,10 @@ int rkisp_debug;
 module_param_named(debug, rkisp_debug, int, 0644);
 MODULE_PARM_DESC(debug, "Debug level (0-1)");
 
+bool rkisp_monitor;
+module_param_named(monitor, rkisp_monitor, bool, 0644);
+MODULE_PARM_DESC(monitor, "rkisp abnormal restart monitor");
+
 static bool rkisp_clk_dbg;
 module_param_named(clk_dbg, rkisp_clk_dbg, bool, 0644);
 MODULE_PARM_DESC(clk_dbg, "rkisp clk set by user");
@@ -718,7 +722,7 @@ static int rkisp_plat_probe(struct platform_device *pdev)
 	if (ret)
 		return ret;
 
-	sprintf(isp_dev->name, "%s%d",
+	sprintf(isp_dev->media_dev.model, "%s%d",
 		DRIVER_NAME, isp_dev->dev_id);
 
 	ret = rkisp_get_reserved_mem(isp_dev);
@@ -742,8 +746,9 @@ static int rkisp_plat_probe(struct platform_device *pdev)
 		}
 	}
 
-	strlcpy(isp_dev->media_dev.model, isp_dev->name,
-		sizeof(isp_dev->media_dev.model));
+	strscpy(isp_dev->name, dev_name(dev), sizeof(isp_dev->name));
+	strscpy(isp_dev->media_dev.driver_name, isp_dev->name,
+		sizeof(isp_dev->media_dev.driver_name));
 	isp_dev->media_dev.dev = dev;
 	isp_dev->media_dev.ops = &rkisp_media_ops;
 

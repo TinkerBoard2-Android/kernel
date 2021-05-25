@@ -7,7 +7,8 @@
 
 #include <linux/anon_inodes.h>
 #include <linux/debugfs.h>
-#include <linux/device.h>
+#include <linux/of_device.h>
+#include <linux/platform_device.h>
 #include <linux/dma-buf.h>
 #include <linux/err.h>
 #include <linux/export.h>
@@ -34,6 +35,8 @@
 #include "ion.h"
 
 static struct ion_device *internal_dev;
+static struct device *ion_dev;
+
 static int heap_id;
 static atomic_long_t total_heap_bytes;
 
@@ -115,6 +118,25 @@ static struct ion_buffer *ion_buffer_create(struct ion_heap *heap,
 
 	INIT_LIST_HEAD(&buffer->attachments);
 	mutex_init(&buffer->lock);
+
+	if (IS_ENABLED(CONFIG_ION_FORCE_DMA_SYNC)) {
+		struct scatterlist *sg;
+		struct sg_table *table = buffer->sg_table;
+		int i;
+
+		/*
+		 * this will set up dma addresses for the sglist -- it is not
+		 * technically correct as per the dma api -- a specific
+		 * device isn't really taking ownership here.  However, in
+		 * practice on our systems the only dma_address space is
+		 * physical addresses.
+		 */
+		for_each_sg(table->sgl, sg, table->nents, i) {
+			sg_dma_address(sg) = sg_phys(sg);
+			sg_dma_len(sg) = sg->length;
+		}
+	}
+
 	mutex_lock(&dev->buffer_lock);
 	ion_buffer_add(dev, buffer);
 	mutex_unlock(&dev->buffer_lock);
@@ -402,16 +424,69 @@ static void ion_dma_buf_kunmap(struct dma_buf *dmabuf, unsigned long offset,
 	ion_dma_buf_vunmap(dmabuf, ptr);
 }
 
+static int ion_sgl_sync_range(struct device *dev, struct scatterlist *sgl,
+			      unsigned int nents, unsigned int offset,
+			      unsigned int length,
+			      enum dma_data_direction dir, bool for_cpu)
+{
+	int i;
+	struct scatterlist *sg;
+	unsigned int len = 0;
+	dma_addr_t sg_dma_addr;
+
+	for_each_sg(sgl, sg, nents, i) {
+		if (sg_dma_len(sg) == 0)
+			break;
+
+		if (i > 0) {
+			pr_warn_ratelimited("Partial cmo only supported with 1 segment\n"
+				"is dma_set_max_seg_size being set on dev:%s\n",
+				dev_name(dev));
+			return -EINVAL;
+		}
+	}
+
+	for_each_sg(sgl, sg, nents, i) {
+		unsigned int sg_offset, sg_left, size = 0;
+
+		if (i == 0)
+			sg_dma_addr = sg_dma_address(sg);
+
+		len += sg->length;
+		if (len <= offset) {
+			sg_dma_addr += sg->length;
+			continue;
+		}
+
+		sg_left = len - offset;
+		sg_offset = sg->length - sg_left;
+
+		size = (length < sg_left) ? length : sg_left;
+		if (for_cpu)
+			dma_sync_single_range_for_cpu(dev, sg_dma_addr,
+						      sg_offset, size, dir);
+		else
+			dma_sync_single_range_for_device(dev, sg_dma_addr,
+							 sg_offset, size, dir);
+
+		offset += size;
+		length -= size;
+		sg_dma_addr += sg->length;
+
+		if (length == 0)
+			break;
+	}
+
+	return 0;
+}
+
 static int ion_dma_buf_begin_cpu_access(struct dma_buf *dmabuf,
 					enum dma_data_direction direction)
 {
 	struct ion_buffer *buffer = dmabuf->priv;
-	void *vaddr;
 	struct ion_dma_buf_attachment *a;
+	void *vaddr;
 	int ret = 0;
-
-	if (!(buffer->flags & ION_FLAG_CACHED))
-		return 0;
 
 	/*
 	 * TODO: Move this elsewhere because we don't always need a vaddr
@@ -427,15 +502,26 @@ static int ion_dma_buf_begin_cpu_access(struct dma_buf *dmabuf,
 	}
 
 	mutex_lock(&buffer->lock);
+	if (IS_ENABLED(CONFIG_ION_FORCE_DMA_SYNC)) {
+		struct device *dev = ion_dev;
+		struct sg_table *table = buffer->sg_table;
+
+		if (dev) {
+			dma_sync_sg_for_cpu(dev, table->sgl, table->nents,
+					    direction);
+			goto unlock;
+		}
+	}
+
 	list_for_each_entry(a, &buffer->attachments, list) {
 		if (!a->mapped)
 			continue;
 		dma_sync_sg_for_cpu(a->dev, a->table->sgl, a->table->nents,
 				    direction);
 	}
-
 unlock:
 	mutex_unlock(&buffer->lock);
+
 	return ret;
 }
 
@@ -445,9 +531,6 @@ static int ion_dma_buf_end_cpu_access(struct dma_buf *dmabuf,
 	struct ion_buffer *buffer = dmabuf->priv;
 	struct ion_dma_buf_attachment *a;
 
-	if (!(buffer->flags & ION_FLAG_CACHED))
-		return 0;
-
 	if (buffer->heap->ops->map_kernel) {
 		mutex_lock(&buffer->lock);
 		ion_buffer_kmap_put(buffer);
@@ -455,6 +538,19 @@ static int ion_dma_buf_end_cpu_access(struct dma_buf *dmabuf,
 	}
 
 	mutex_lock(&buffer->lock);
+	if (IS_ENABLED(CONFIG_ION_FORCE_DMA_SYNC)) {
+		struct device *dev = ion_dev;
+		struct sg_table *table = buffer->sg_table;
+
+		if (dev) {
+			dma_sync_sg_for_device(dev, table->sgl, table->nents,
+					       direction);
+			mutex_unlock(&buffer->lock);
+
+			return 0;
+		}
+	}
+
 	list_for_each_entry(a, &buffer->attachments, list) {
 		if (!a->mapped)
 			continue;
@@ -466,6 +562,56 @@ static int ion_dma_buf_end_cpu_access(struct dma_buf *dmabuf,
 	return 0;
 }
 
+static int ion_dma_buf_begin_cpu_access_partial(struct dma_buf *dmabuf,
+						enum dma_data_direction dir,
+						unsigned int offset,
+						unsigned int len)
+{
+	struct ion_buffer *buffer = dmabuf->priv;
+	struct ion_dma_buf_attachment *a;
+	int ret = 0;
+
+	if (!(buffer->flags & ION_FLAG_CACHED))
+		return 0;
+
+	mutex_lock(&buffer->lock);
+	list_for_each_entry(a, &buffer->attachments, list) {
+		if (!a->mapped)
+			continue;
+
+		ret = ion_sgl_sync_range(a->dev, a->table->sgl, a->table->nents,
+					 offset, len, dir, true);
+	}
+	mutex_unlock(&buffer->lock);
+
+	return ret;
+}
+
+static int ion_dma_buf_end_cpu_access_partial(struct dma_buf *dmabuf,
+					      enum dma_data_direction direction,
+					      unsigned int offset,
+					      unsigned int len)
+{
+	struct ion_buffer *buffer = dmabuf->priv;
+	struct ion_dma_buf_attachment *a;
+	int ret = 0;
+
+	if (!(buffer->flags & ION_FLAG_CACHED))
+		return 0;
+
+	mutex_lock(&buffer->lock);
+	list_for_each_entry(a, &buffer->attachments, list) {
+		if (!a->mapped)
+			continue;
+
+		ret = ion_sgl_sync_range(a->dev, a->table->sgl, a->table->nents,
+					 offset, len, direction, false);
+	}
+	mutex_unlock(&buffer->lock);
+
+	return ret;
+}
+
 static const struct dma_buf_ops dma_buf_ops = {
 	.map_dma_buf = ion_map_dma_buf,
 	.unmap_dma_buf = ion_unmap_dma_buf,
@@ -475,6 +621,8 @@ static const struct dma_buf_ops dma_buf_ops = {
 	.detach = ion_dma_buf_detatch,
 	.begin_cpu_access = ion_dma_buf_begin_cpu_access,
 	.end_cpu_access = ion_dma_buf_end_cpu_access,
+	.begin_cpu_access_partial = ion_dma_buf_begin_cpu_access_partial,
+	.end_cpu_access_partial = ion_dma_buf_end_cpu_access_partial,
 	.map = ion_dma_buf_kmap,
 	.unmap = ion_dma_buf_kunmap,
 	.vmap = ion_dma_buf_vmap,
@@ -520,6 +668,15 @@ int ion_alloc(size_t len, unsigned int heap_id_mask, unsigned int flags)
 
 	if (IS_ERR(buffer))
 		return PTR_ERR(buffer);
+
+	if (IS_ENABLED(CONFIG_ION_FORCE_DMA_SYNC)) {
+		struct device *dev = ion_dev;
+		struct sg_table *table = buffer->sg_table;
+
+		if (dev)
+			dma_sync_sg_for_device(dev, table->sgl, table->nents,
+					       DMA_BIDIRECTIONAL);
+	}
 
 	get_task_comm(task_comm, current->group_leader);
 
@@ -587,6 +744,31 @@ int ion_query_heaps(struct ion_heap_query *query)
 out:
 	up_read(&dev->lock);
 	return ret;
+}
+
+int ion_get_phys(struct ion_phys_data *phys)
+{
+	struct dma_buf *dmabuf;
+	struct ion_buffer *buffer;
+
+	if (IS_ERR_OR_NULL(phys))
+		return -EINVAL;
+
+	dmabuf = dma_buf_get(phys->fd);
+	if (IS_ERR_OR_NULL(dmabuf))
+		return -ENOENT;
+
+	phys->paddr = (__u64)-1;
+	buffer = dmabuf->priv;
+	if (!IS_ERR_OR_NULL(buffer) &&
+	    (buffer->heap->type == ION_HEAP_TYPE_SYSTEM_CONTIG ||
+	     buffer->heap->type == ION_HEAP_TYPE_DMA ||
+	     buffer->heap->type == ION_HEAP_TYPE_CARVEOUT))
+		phys->paddr = sg_phys(buffer->sg_table->sgl);
+
+	dma_buf_put(dmabuf);
+
+	return 0;
 }
 
 static const struct file_operations ion_fops = {
@@ -786,6 +968,29 @@ static const struct file_operations ion_heaps_operations = {
 };
 #endif
 
+static const struct platform_device_info ion_dev_info = {
+	.name		= "ion",
+	.id		= PLATFORM_DEVID_AUTO,
+	.dma_mask	= DMA_BIT_MASK(32),
+};
+
+static void ion_device_register(void)
+{
+	struct platform_device *pdev;
+	int ret;
+
+	pdev = platform_device_register_full(&ion_dev_info);
+	if (pdev) {
+		ret = of_dma_configure(&pdev->dev, NULL, true);
+		if (ret) {
+			platform_device_unregister(pdev);
+			pdev = NULL;
+		}
+	}
+
+	ion_dev = pdev ? &pdev->dev : NULL;
+}
+
 static int ion_device_create(void)
 {
 	struct ion_device *idev;
@@ -821,6 +1026,8 @@ static int ion_device_create(void)
 	init_rwsem(&idev->lock);
 	plist_head_init(&idev->heaps);
 	internal_dev = idev;
+	ion_device_register();
+
 	return 0;
 
 err_sysfs:

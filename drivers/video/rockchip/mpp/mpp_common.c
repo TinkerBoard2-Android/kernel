@@ -84,6 +84,8 @@ const char *enc_info_item_name[ENC_INFO_BUTT] = {
 #endif
 
 static void mpp_free_task(struct kref *ref);
+static void mpp_attach_workqueue(struct mpp_dev *mpp,
+				 struct mpp_taskqueue *queue);
 
 /* task queue schedule */
 static int
@@ -185,10 +187,9 @@ mpp_taskqueue_pop_running(struct mpp_taskqueue *queue,
 }
 
 static void
-mpp_taskqueue_trigger_work(struct mpp_taskqueue *queue,
-			   struct workqueue_struct *workq)
+mpp_taskqueue_trigger_work(struct mpp_dev *mpp)
 {
-	queue_work(workq, &queue->work);
+	queue_work(mpp->workq, &mpp->work);
 }
 
 int mpp_power_on(struct mpp_dev *mpp)
@@ -372,7 +373,7 @@ static int mpp_process_task(struct mpp_session *session,
 	task->task_index = atomic_fetch_inc(&mpp->task_index);
 	INIT_DELAYED_WORK(&task->timeout_work, mpp_task_timeout_work);
 
-	if (mpp->hw_ops->get_freq)
+	if (mpp->auto_freq_en && mpp->hw_ops->get_freq)
 		mpp->hw_ops->get_freq(mpp, task);
 
 	/*
@@ -388,7 +389,7 @@ static int mpp_process_task(struct mpp_session *session,
 	mpp_taskqueue_push_pending(mpp->queue, task);
 	set_bit(TASK_STATE_PENDING, &task->state);
 	/* trigger current queue to run task */
-	mpp_taskqueue_trigger_work(mpp->queue, mpp->workq);
+	mpp_taskqueue_trigger_work(mpp);
 	kref_put(&task->ref, mpp_free_task);
 
 	return 0;
@@ -458,10 +459,10 @@ int mpp_dev_reset(struct mpp_dev *mpp)
 	else
 		mpp_set_grf(mpp->grf_info);
 
-	if (mpp->hw_ops->reduce_freq)
+	if (mpp->auto_freq_en && mpp->hw_ops->reduce_freq)
 		mpp->hw_ops->reduce_freq(mpp);
 	/* FIXME lock resource lock of the other devices in combo */
-	down_write(&mpp->iommu_info->rw_sem);
+	mpp_iommu_down_write(mpp->iommu_info);
 	mpp_reset_down_write(mpp->reset_group);
 	atomic_set(&mpp->reset_request, 0);
 	mpp_iommu_detach(mpp->iommu_info);
@@ -479,7 +480,7 @@ int mpp_dev_reset(struct mpp_dev *mpp)
 
 	mpp_iommu_attach(mpp->iommu_info);
 	mpp_reset_up_write(mpp->reset_group);
-	up_write(&mpp->iommu_info->rw_sem);
+	mpp_iommu_up_write(mpp->iommu_info);
 
 	dev_info(mpp->dev, "reset done\n");
 
@@ -521,7 +522,7 @@ static int mpp_task_run(struct mpp_dev *mpp,
 	mpp_debug(DEBUG_TASK_INFO, "pid %d, start hw %s\n",
 		  task->session->pid, dev_name(mpp->dev));
 
-	if (mpp->hw_ops->set_freq)
+	if (mpp->auto_freq_en && mpp->hw_ops->set_freq)
 		mpp->hw_ops->set_freq(mpp, task);
 	/*
 	 * TODO: Lock the reader locker of the device resource lock here,
@@ -543,10 +544,8 @@ static int mpp_task_run(struct mpp_dev *mpp,
 static void mpp_task_try_run(struct work_struct *work_s)
 {
 	struct mpp_task *task;
-	struct mpp_dev *mpp;
-	struct mpp_taskqueue *queue = container_of(work_s,
-						   struct mpp_taskqueue,
-						   work);
+	struct mpp_dev *mpp = container_of(work_s, struct mpp_dev, work);
+	struct mpp_taskqueue *queue = mpp->queue;
 
 	mpp_debug_enter();
 
@@ -702,6 +701,7 @@ static int mpp_attach_service(struct mpp_dev *mpp, struct device *dev)
 	u32 reset_group_node = 0;
 	struct device_node *np = NULL;
 	struct platform_device *pdev = NULL;
+	struct mpp_taskqueue *queue = NULL;
 	int ret = 0;
 
 	np = of_parse_phandle(dev->of_node, "rockchip,srv", 0);
@@ -728,28 +728,29 @@ static int mpp_attach_service(struct mpp_dev *mpp, struct device *dev)
 
 	ret = of_property_read_u32(dev->of_node,
 				   "rockchip,taskqueue-node", &taskqueue_node);
+	if (taskqueue_node >= mpp->srv->taskqueue_cnt) {
+		dev_err(dev, "taskqueue-node %d must less than %d\n",
+			taskqueue_node, mpp->srv->taskqueue_cnt);
+		ret = -ENODEV;
+		goto err_put_pdev;
+	}
+
 	if (ret) {
 		/* if device not set, then alloc one */
-		struct mpp_taskqueue *queue;
-
-		queue = devm_kzalloc(dev, sizeof(*queue), GFP_KERNEL);
-		if (!queue) {
-			ret = -ENOMEM;
+		queue = mpp_taskqueue_init(dev);
+		if (!queue)
 			goto err_put_pdev;
-		}
-		mpp_taskqueue_init(queue, mpp->srv);
-		mpp->queue = queue;
 	} else {
 		/* set taskqueue according dtsi */
-		if (taskqueue_node >= mpp->srv->taskqueue_cnt) {
-			dev_err(dev, "taskqueue-node %d must less than %d\n",
-				taskqueue_node, mpp->srv->taskqueue_cnt);
+		queue = mpp->srv->task_queues[taskqueue_node];
+		if (!queue) {
+			dev_err(dev, "taskqueue attach to invalid node %d\n",
+				taskqueue_node);
 			ret = -ENODEV;
 			goto err_put_pdev;
-		} else {
-			mpp->queue = mpp->srv->task_queues[taskqueue_node];
 		}
 	}
+	mpp_attach_workqueue(mpp, queue);
 
 	ret = of_property_read_u32(dev->of_node,
 				   "rockchip,resetgroup-node", &reset_group_node);
@@ -777,20 +778,48 @@ err_put_pdev:
 	return ret;
 }
 
-int mpp_taskqueue_init(struct mpp_taskqueue *queue,
-		       struct mpp_service *srv)
+struct mpp_taskqueue *mpp_taskqueue_init(struct device *dev)
 {
+	struct mpp_taskqueue *queue = devm_kzalloc(dev, sizeof(*queue),
+						   GFP_KERNEL);
+	if (!queue)
+		return NULL;
+
 	mutex_init(&queue->pending_lock);
 	mutex_init(&queue->running_lock);
 	mutex_init(&queue->mmu_lock);
+	mutex_init(&queue->dev_lock);
 	INIT_LIST_HEAD(&queue->pending_list);
 	INIT_LIST_HEAD(&queue->running_list);
 	INIT_LIST_HEAD(&queue->mmu_list);
-	INIT_WORK(&queue->work, mpp_task_try_run);
+	INIT_LIST_HEAD(&queue->dev_list);
+	/* default taskqueue has max 16 task capacity */
+	queue->task_capacity = MPP_MAX_TASK_CAPACITY;
 
-	queue->srv = srv;
+	return queue;
+}
 
-	return 0;
+static void mpp_attach_workqueue(struct mpp_dev *mpp,
+				 struct mpp_taskqueue *queue)
+{
+	mpp->queue = queue;
+	INIT_LIST_HEAD(&mpp->queue_link);
+	mutex_lock(&queue->dev_lock);
+	list_add_tail(&mpp->queue_link, &queue->dev_list);
+	if (queue->task_capacity > mpp->task_capacity)
+		queue->task_capacity = mpp->task_capacity;
+	mutex_unlock(&queue->dev_lock);
+}
+
+static void mpp_detach_workqueue(struct mpp_dev *mpp)
+{
+	struct mpp_taskqueue *queue = mpp->queue;
+
+	if (queue) {
+		mutex_lock(&queue->dev_lock);
+		list_del_init(&mpp->queue_link);
+		mutex_unlock(&queue->dev_lock);
+	}
 }
 
 static int mpp_check_cmd_v1(__u32 cmd)
@@ -935,8 +964,7 @@ static int mpp_process_request(struct mpp_session *session,
 		if (!mpp)
 			return -EINVAL;
 		session->device_type = (enum MPP_DEVICE_TYPE)client_type;
-		session->dma = mpp_dma_session_create(mpp->dev);
-		session->dma->max_buffers = mpp->session_max_buffers;
+		session->dma = mpp_dma_session_create(mpp->dev, mpp->session_max_buffers);
 		session->mpp = mpp;
 		session->index = atomic_fetch_inc(&mpp->session_index);
 		if (mpp->dev_ops->init_session) {
@@ -1001,9 +1029,9 @@ static int mpp_process_request(struct mpp_session *session,
 				return -EINVAL;
 
 			mpp_session_clear(mpp, session);
-			down_write(&mpp->iommu_info->rw_sem);
+			mpp_iommu_down_write(mpp->iommu_info);
 			ret = mpp_dma_session_destroy(session->dma);
-			up_write(&mpp->iommu_info->rw_sem);
+			mpp_iommu_up_write(mpp->iommu_info);
 		}
 		return ret;
 	} break;
@@ -1030,10 +1058,10 @@ static int mpp_process_request(struct mpp_session *session,
 			struct mpp_dma_buffer *buffer;
 			int fd = data[i];
 
-			down_read(&mpp->iommu_info->rw_sem);
+			mpp_iommu_down_read(mpp->iommu_info);
 			buffer = mpp_dma_import_fd(mpp->iommu_info,
 						   session->dma, fd);
-			up_read(&mpp->iommu_info->rw_sem);
+			mpp_iommu_up_read(mpp->iommu_info);
 			if (IS_ERR_OR_NULL(buffer)) {
 				mpp_err("can not import fd %d\n", fd);
 				return -EINVAL;
@@ -1082,7 +1110,6 @@ static int mpp_process_request(struct mpp_session *session,
 			return mpp->dev_ops->ioctl(session, req);
 
 		mpp_debug(DEBUG_IOCTL, "unknown mpp ioctl cmd %x\n", req->cmd);
-		return -ENOIOCTLCMD;
 	} break;
 	}
 
@@ -1186,7 +1213,6 @@ static int mpp_dev_open(struct inode *inode, struct file *filp)
 	session->srv = srv;
 	session->pid = current->pid;
 
-	mutex_init(&session->reg_lock);
 	mutex_init(&session->pending_lock);
 	mutex_init(&session->done_lock);
 	INIT_LIST_HEAD(&session->pending_list);
@@ -1240,9 +1266,9 @@ static int mpp_dev_release(struct inode *inode, struct file *filp)
 		/* remove this filp from the asynchronusly notified filp's */
 		mpp_session_clear(mpp, session);
 
-		down_read(&mpp->iommu_info->rw_sem);
+		mpp_iommu_down_read(mpp->iommu_info);
 		mpp_dma_session_destroy(session->dma);
-		up_read(&mpp->iommu_info->rw_sem);
+		mpp_iommu_up_read(mpp->iommu_info);
 	}
 	mutex_lock(&session->srv->session_lock);
 	list_del_init(&session->session_link);
@@ -1282,39 +1308,53 @@ const struct file_operations rockchip_mpp_fops = {
 struct mpp_mem_region *
 mpp_task_attach_fd(struct mpp_task *task, int fd)
 {
-	struct mpp_mem_region *mem_region = NULL;
+	struct mpp_mem_region *mem_region = NULL, *loop = NULL, *n;
 	struct mpp_dma_buffer *buffer = NULL;
 	struct mpp_dev *mpp = task->session->mpp;
 	struct mpp_dma_session *dma = task->session->dma;
+	u32 mem_num = ARRAY_SIZE(task->mem_regions);
+	bool found = false;
 
 	if (fd <= 0 || !dma || !mpp)
 		return ERR_PTR(-EINVAL);
 
-	mem_region = kzalloc(sizeof(*mem_region), GFP_KERNEL);
-	if (!mem_region)
+	if (task->mem_count > mem_num) {
+		mpp_err("mem_count %d must less than %d\n", task->mem_count, mem_num);
 		return ERR_PTR(-ENOMEM);
-
-	down_read(&mpp->iommu_info->rw_sem);
-	buffer = mpp_dma_import_fd(mpp->iommu_info, dma, fd);
-	up_read(&mpp->iommu_info->rw_sem);
-	if (IS_ERR_OR_NULL(buffer)) {
-		mpp_err("can't import dma-buf %d\n", fd);
-		goto fail;
 	}
 
-	mem_region->hdl = buffer;
-	mem_region->iova = buffer->iova;
-	mem_region->len = buffer->size;
+	/* find fd whether had import */
+	list_for_each_entry_safe_reverse(loop, n, &task->mem_region_list, reg_link) {
+		if (loop->fd == fd) {
+			found = true;
+			break;
+		}
+	}
 
-	INIT_LIST_HEAD(&mem_region->reg_link);
-	mutex_lock(&task->session->reg_lock);
+	mem_region = &task->mem_regions[task->mem_count];
+	if (found) {
+		memcpy(mem_region, loop, sizeof(*loop));
+		buffer = mem_region->hdl;
+		kref_get(&buffer->ref);
+		buffer->last_used = ktime_get();
+	} else {
+		down_read(&mpp->iommu_info->rw_sem);
+		buffer = mpp_dma_import_fd(mpp->iommu_info, dma, fd);
+		up_read(&mpp->iommu_info->rw_sem);
+		if (IS_ERR_OR_NULL(buffer)) {
+			mpp_err("can't import dma-buf %d\n", fd);
+			return ERR_PTR(-ENOMEM);
+		}
+
+		mem_region->hdl = buffer;
+		mem_region->iova = buffer->iova;
+		mem_region->len = buffer->size;
+		mem_region->fd = fd;
+	}
+	task->mem_count++;
 	list_add_tail(&mem_region->reg_link, &task->mem_region_list);
-	mutex_unlock(&task->session->reg_lock);
 
 	return mem_region;
-fail:
-	kfree(mem_region);
-	return ERR_PTR(-ENOMEM);
 }
 
 int mpp_translate_reg_address(struct mpp_session *session,
@@ -1473,7 +1513,7 @@ int mpp_task_init(struct mpp_session *session,
 	INIT_LIST_HEAD(&task->pending_link);
 	INIT_LIST_HEAD(&task->queue_link);
 	INIT_LIST_HEAD(&task->mem_region_list);
-
+	task->mem_count = 0;
 	task->session = session;
 
 	return 0;
@@ -1510,18 +1550,16 @@ int mpp_task_finalize(struct mpp_session *session,
 	struct mpp_mem_region *mem_region = NULL, *n;
 
 	mpp = session->mpp;
-	mutex_lock(&session->reg_lock);
 	/* release memory region attach to this registers table. */
 	list_for_each_entry_safe(mem_region, n,
 				 &task->mem_region_list,
 				 reg_link) {
-		down_read(&mpp->iommu_info->rw_sem);
+		mpp_iommu_down_read(mpp->iommu_info);
 		mpp_dma_release(session->dma, mem_region->hdl);
-		up_read(&mpp->iommu_info->rw_sem);
+		mpp_iommu_up_read(mpp->iommu_info);
 		list_del_init(&mem_region->reg_link);
-		kfree(mem_region);
 	}
-	mutex_unlock(&session->reg_lock);
+
 	return 0;
 }
 
@@ -1627,6 +1665,18 @@ int mpp_dev_probe(struct mpp_dev *mpp,
 	struct device_node *np = dev->of_node;
 	struct mpp_hw_info *hw_info = mpp->var->hw_info;
 
+	/* Get disable auto frequent flag from dtsi */
+	mpp->auto_freq_en = !device_property_read_bool(dev, "rockchip,disable-auto-freq");
+	/* read link table capacity */
+	ret = of_property_read_u32(np, "rockchip,task-capacity",
+				   &mpp->task_capacity);
+	if (ret) {
+		mpp->task_capacity = 1;
+		INIT_WORK(&mpp->work, mpp_task_try_run);
+	} else {
+		INIT_WORK(&mpp->work, NULL);
+	}
+
 	/* Get and attach to service */
 	ret = mpp_attach_service(mpp, dev);
 	if (ret) {
@@ -1719,6 +1769,7 @@ failed_init:
 	pm_runtime_put_sync(dev);
 failed:
 	destroy_workqueue(mpp->workq);
+	mpp_detach_workqueue(mpp);
 	device_init_wakeup(dev, false);
 	pm_runtime_disable(dev);
 
@@ -1738,6 +1789,7 @@ int mpp_dev_remove(struct mpp_dev *mpp)
 		mpp->workq = NULL;
 	}
 
+	mpp_detach_workqueue(mpp);
 	device_init_wakeup(mpp->dev, false);
 	pm_runtime_disable(mpp->dev);
 
@@ -1780,7 +1832,8 @@ irqreturn_t mpp_dev_isr_sched(int irq, void *param)
 	irqreturn_t ret = IRQ_NONE;
 	struct mpp_dev *mpp = param;
 
-	if (mpp->hw_ops->reduce_freq &&
+	if (mpp->auto_freq_en &&
+	    mpp->hw_ops->reduce_freq &&
 	    list_empty(&mpp->queue->pending_list))
 		mpp->hw_ops->reduce_freq(mpp);
 
@@ -1788,7 +1841,7 @@ irqreturn_t mpp_dev_isr_sched(int irq, void *param)
 		ret = mpp->dev_ops->isr(mpp);
 
 	/* trigger current queue to run next task */
-	mpp_taskqueue_trigger_work(mpp->queue, mpp->workq);
+	mpp_taskqueue_trigger_work(mpp);
 
 	return ret;
 }

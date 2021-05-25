@@ -224,6 +224,32 @@ u32 rkcif_read_grf_reg(struct rkcif_device *dev, enum cif_reg_index index)
 	return val;
 }
 
+void rkcif_enable_dvp_clk_dual_edge(struct rkcif_device *dev, bool on)
+{
+	struct rkcif_hw *cif_hw = dev->hw_dev;
+	u32 val = 0x0;
+
+	if (!IS_ERR(cif_hw->grf)) {
+
+		if (dev->chip_id == CHIP_RK3568_CIF) {
+			if (on)
+				val = RK3568_CIF_PCLK_DUAL_EDGE;
+			else
+				val = RK3568_CIF_PCLK_SINGLE_EDGE;
+			rkcif_write_grf_reg(dev, CIF_REG_GRF_CIFIO_CON1, val);
+		} else if (dev->chip_id == CHIP_RV1126_CIF) {
+			if (on)
+				val = CIF_SAMPLING_EDGE_DOUBLE;
+			else
+				val = CIF_SAMPLING_EDGE_SINGLE;
+			rkcif_write_grf_reg(dev, CIF_REG_GRF_CIFIO_CON, val);
+		}
+	}
+
+	v4l2_info(&dev->v4l2_dev,
+		  "set dual edge mode(%s,0x%x)!!!\n", on ? "on" : "off", val);
+}
+
 void rkcif_config_dvp_clk_sampling_edge(struct rkcif_device *dev,
 					enum rkcif_clk_edge edge)
 {
@@ -431,10 +457,14 @@ static int rkcif_create_links(struct rkcif_device *dev)
 	unsigned int s, pad, id, stream_num = 0;
 	bool mipi_lvds_linked = false;
 
-	if (dev->inf_id == RKCIF_MIPI_LVDS)
+	if (dev->chip_id < CHIP_RV1126_CIF) {
+		if (dev->inf_id == RKCIF_MIPI_LVDS)
+			stream_num = RKCIF_MAX_STREAM_MIPI;
+		else
+			stream_num = RKCIF_SINGLE_STREAM;
+	} else {
 		stream_num = RKCIF_MAX_STREAM_MIPI;
-	else
-		stream_num = RKCIF_SINGLE_STREAM;
+	}
 
 	/* sensor links(or mipi-phy) */
 	for (s = 0; s < dev->num_sensors; ++s) {
@@ -470,9 +500,7 @@ static int rkcif_create_links(struct rkcif_device *dev)
 
 				if ((linked_sensor.mbus.type == V4L2_MBUS_BT656 ||
 				     linked_sensor.mbus.type == V4L2_MBUS_PARALLEL) &&
-				    (dev->chip_id == CHIP_RK1808_CIF ||
-				     dev->chip_id == CHIP_RV1126_CIF ||
-				     dev->chip_id == CHIP_RK3568_CIF)) {
+				    (dev->chip_id == CHIP_RK1808_CIF)) {
 					source_entity = &linked_sensor.sd->entity;
 					sink_entity = &dev->stream[RKCIF_STREAM_CIF].vnode.vdev.entity;
 
@@ -485,6 +513,23 @@ static int rkcif_create_links(struct rkcif_device *dev)
 						dev_err(dev->dev, "failed to create link for %s\n",
 							linked_sensor.sd->name);
 					break;
+				}
+
+				if ((linked_sensor.mbus.type == V4L2_MBUS_BT656 ||
+				     linked_sensor.mbus.type == V4L2_MBUS_PARALLEL) &&
+				    (dev->chip_id >= CHIP_RV1126_CIF)) {
+					source_entity = &linked_sensor.sd->entity;
+					sink_entity = &dev->stream[pad].vnode.vdev.entity;
+
+					ret = media_create_pad_link(source_entity,
+								    pad,
+								    sink_entity,
+								    0,
+								    MEDIA_LNK_FL_ENABLED);
+					if (ret)
+						dev_err(dev->dev, "failed to create link for %s pad[%d]\n",
+							linked_sensor.sd->name, pad);
+					continue;
 				}
 
 				for (id = 0; id < stream_num; id++) {
@@ -542,16 +587,67 @@ static int _set_pipeline_default_fmt(struct rkcif_device *dev)
 	return 0;
 }
 
+static int subdev_asyn_register_itf(struct rkcif_device *dev)
+{
+	struct sditf_priv *sditf = dev->sditf;
+	int ret = 0;
+
+	if (sditf)
+		ret = v4l2_async_register_subdev_sensor_common(&sditf->sd);
+
+	return ret;
+}
+
 static int subdev_notifier_complete(struct v4l2_async_notifier *notifier)
 {
 	struct rkcif_device *dev;
 	struct rkcif_sensor_info *sensor;
+	struct v4l2_subdev *sd;
+	struct v4l2_device *v4l2_dev = NULL;
 	int ret, index;
 
 	dev = container_of(notifier, struct rkcif_device, notifier);
 
+	v4l2_dev = &dev->v4l2_dev;
+
 	for (index = 0; index < dev->num_sensors; index++) {
 		sensor = &dev->sensors[index];
+
+		list_for_each_entry(sd, &v4l2_dev->subdevs, list) {
+			if (sd->ops) {
+				if (sd == sensor->sd) {
+					ret = v4l2_subdev_call(sd,
+							       video,
+							       g_mbus_config,
+							       &sensor->mbus);
+					if (ret)
+						v4l2_err(v4l2_dev,
+							 "get mbus config failed for linking\n");
+				}
+			}
+		}
+
+		if (sensor->mbus.type == V4L2_MBUS_CCP2 ||
+		    sensor->mbus.type == V4L2_MBUS_CSI2) {
+
+			switch (sensor->mbus.flags & V4L2_MBUS_CSI2_LANES) {
+			case V4L2_MBUS_CSI2_1_LANE:
+				sensor->lanes = 1;
+				break;
+			case V4L2_MBUS_CSI2_2_LANE:
+				sensor->lanes = 2;
+				break;
+			case V4L2_MBUS_CSI2_3_LANE:
+				sensor->lanes = 3;
+				break;
+			case V4L2_MBUS_CSI2_4_LANE:
+				sensor->lanes = 4;
+				break;
+			default:
+				sensor->lanes = 1;
+			}
+		}
+
 		if (sensor->mbus.type == V4L2_MBUS_CCP2) {
 			ret = rkcif_register_lvds_subdev(dev);
 			if (ret < 0) {
@@ -612,15 +708,19 @@ static int subdev_notifier_bound(struct v4l2_async_notifier *notifier,
 	struct rkcif_async_subdev *s_asd = container_of(asd,
 					struct rkcif_async_subdev, asd);
 
-	if (cif_dev->num_sensors == ARRAY_SIZE(cif_dev->sensors))
+	if (cif_dev->num_sensors == ARRAY_SIZE(cif_dev->sensors)) {
+		v4l2_err(&cif_dev->v4l2_dev,
+			 "%s: the num of subdev is beyond %d\n",
+			 __func__, cif_dev->num_sensors);
 		return -EBUSY;
+	}
 
 	cif_dev->sensors[cif_dev->num_sensors].lanes = s_asd->lanes;
 	cif_dev->sensors[cif_dev->num_sensors].mbus = s_asd->mbus;
 	cif_dev->sensors[cif_dev->num_sensors].sd = subdev;
 	++cif_dev->num_sensors;
 
-	v4l2_dbg(1, rkcif_debug, subdev, "Async registered subdev\n");
+	v4l2_err(subdev, "Async registered subdev\n");
 
 	return 0;
 }
@@ -667,11 +767,17 @@ static int cif_subdev_notifier(struct rkcif_device *cif_dev)
 	ret = v4l2_async_notifier_parse_fwnode_endpoints(
 		dev, ntf, sizeof(struct rkcif_async_subdev), rkcif_fwnode_parse);
 
-	if (ret < 0)
+	if (ret < 0) {
+		v4l2_err(&cif_dev->v4l2_dev,
+			 "%s: parse fwnode failed\n", __func__);
 		return ret;
+	}
 
-	if (!ntf->num_subdevs)
+	if (!ntf->num_subdevs) {
+		v4l2_warn(&cif_dev->v4l2_dev,
+			 "%s: no subdev be found!\n", __func__);
 		return -ENODEV;	/* no endpoint */
+	}
 
 	ntf->ops = &subdev_notifier_ops;
 
@@ -686,14 +792,19 @@ static int rkcif_register_platform_subdevs(struct rkcif_device *cif_dev)
 {
 	int stream_num = 0, ret;
 
-	if (cif_dev->inf_id == RKCIF_MIPI_LVDS) {
-		stream_num = RKCIF_MAX_STREAM_MIPI;
-		ret = rkcif_register_stream_vdevs(cif_dev, stream_num,
-						  true);
+	if (cif_dev->chip_id < CHIP_RV1126_CIF) {
+		if (cif_dev->inf_id == RKCIF_MIPI_LVDS) {
+			stream_num = RKCIF_MAX_STREAM_MIPI;
+			ret = rkcif_register_stream_vdevs(cif_dev, stream_num,
+							  true);
+		} else {
+			stream_num = RKCIF_SINGLE_STREAM;
+			ret = rkcif_register_stream_vdevs(cif_dev, stream_num,
+							  false);
+		}
 	} else {
-		stream_num = RKCIF_SINGLE_STREAM;
-		ret = rkcif_register_stream_vdevs(cif_dev, stream_num,
-						  false);
+		stream_num = RKCIF_MAX_STREAM_MIPI;
+		ret = rkcif_register_stream_vdevs(cif_dev, stream_num, true);
 	}
 
 	if (ret < 0) {
@@ -924,13 +1035,21 @@ int rkcif_plat_init(struct rkcif_device *cif_dev, struct device_node *node, int 
 	if (cif_dev->chip_id == CHIP_RV1126_CIF_LITE)
 		cif_dev->isr_hdl = rkcif_irq_lite_handler;
 
-	if (cif_dev->inf_id == RKCIF_MIPI_LVDS) {
+	if (cif_dev->chip_id < CHIP_RV1126_CIF) {
+		if (cif_dev->inf_id == RKCIF_MIPI_LVDS) {
+			rkcif_stream_init(cif_dev, RKCIF_STREAM_MIPI_ID0);
+			rkcif_stream_init(cif_dev, RKCIF_STREAM_MIPI_ID1);
+			rkcif_stream_init(cif_dev, RKCIF_STREAM_MIPI_ID2);
+			rkcif_stream_init(cif_dev, RKCIF_STREAM_MIPI_ID3);
+		} else {
+			rkcif_stream_init(cif_dev, RKCIF_STREAM_CIF);
+		}
+	} else {
+		/* for rv1126/rk356x, bt656/bt1120/mipi are multi channels */
 		rkcif_stream_init(cif_dev, RKCIF_STREAM_MIPI_ID0);
 		rkcif_stream_init(cif_dev, RKCIF_STREAM_MIPI_ID1);
 		rkcif_stream_init(cif_dev, RKCIF_STREAM_MIPI_ID2);
 		rkcif_stream_init(cif_dev, RKCIF_STREAM_MIPI_ID3);
-	} else {
-		rkcif_stream_init(cif_dev, RKCIF_STREAM_CIF);
 	}
 
 #if defined(CONFIG_ROCKCHIP_CIF_WORKMODE_PINGPONG)
@@ -989,16 +1108,22 @@ int rkcif_plat_uninit(struct rkcif_device *cif_dev)
 
 	if (cif_dev->active_sensor->mbus.type == V4L2_MBUS_CCP2)
 		rkcif_unregister_lvds_subdev(cif_dev);
+
 	if (cif_dev->active_sensor->mbus.type == V4L2_MBUS_BT656 ||
 	    cif_dev->active_sensor->mbus.type == V4L2_MBUS_PARALLEL)
 		rkcif_unregister_dvp_sof_subdev(cif_dev);
 
 	media_device_unregister(&cif_dev->media_dev);
 	v4l2_device_unregister(&cif_dev->v4l2_dev);
-	if (cif_dev->inf_id == RKCIF_MIPI_LVDS)
+
+	if (cif_dev->chip_id < CHIP_RV1126_CIF) {
+		if (cif_dev->inf_id == RKCIF_MIPI_LVDS)
+			stream_num = RKCIF_MAX_STREAM_MIPI;
+		else
+			stream_num = RKCIF_SINGLE_STREAM;
+	} else {
 		stream_num = RKCIF_MAX_STREAM_MIPI;
-	else
-		stream_num = RKCIF_SINGLE_STREAM;
+	}
 	rkcif_unregister_stream_vdevs(cif_dev, stream_num);
 
 	return 0;
@@ -1111,8 +1236,12 @@ static int __maybe_unused __rkcif_clr_unready_dev(void)
 	struct rkcif_device *cif_dev;
 
 	mutex_lock(&rkcif_dev_mutex);
-	list_for_each_entry(cif_dev, &rkcif_device_list, list)
+
+	list_for_each_entry(cif_dev, &rkcif_device_list, list) {
+		subdev_asyn_register_itf(cif_dev);
 		v4l2_async_notifier_clr_unready_dev(&cif_dev->notifier);
+	}
+
 	mutex_unlock(&rkcif_dev_mutex);
 
 	return 0;
@@ -1137,7 +1266,7 @@ static int __init rkcif_clr_unready_dev(void)
 
 	return 0;
 }
-late_initcall_sync(rkcif_clr_unready_dev);
+late_initcall(rkcif_clr_unready_dev);
 #endif
 
 static const struct dev_pm_ops rkcif_plat_pm_ops = {

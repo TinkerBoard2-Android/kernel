@@ -137,9 +137,10 @@ static struct rockchip_cpuclk_rate_table rv1126_cpuclk_rates[] __initdata = {
 };
 
 static const struct rockchip_cpuclk_reg_data rv1126_cpuclk_data = {
-	.core_reg = RV1126_CLKSEL_CON(0),
-	.div_core_shift = 0,
-	.div_core_mask = 0x1f,
+	.core_reg[0] = RV1126_CLKSEL_CON(0),
+	.div_core_shift[0] = 0,
+	.div_core_mask[0] = 0x1f,
+	.num_cores = 1,
 	.mux_core_alt = 0,
 	.mux_core_main = 2,
 	.mux_core_shift = 6,
@@ -179,8 +180,8 @@ PNAME(mux_clk_isp_p)			= { "clk_isp_div", "clk_isp_np5" };
 PNAME(mux_gpll_usb480m_p)		= { "gpll", "usb480m" };
 PNAME(mux_cif_out2io_p)			= { "xin24m", "clk_cif_out2io_div", "clk_cif_out2io_fracdiv" };
 PNAME(mux_mipicsi_out2io_p)		= { "xin24m", "clk_mipicsi_out2io_div", "clk_mipicsi_out2io_fracdiv" };
-PNAME(mux_aclk_pdispp_p)		= { "aclk_pdispp_div", "aclk_pdispp_npu" };
-PNAME(mux_clk_ispp_p)			= { "clk_ispp_div", "clk_ispp_npu" };
+PNAME(mux_aclk_pdispp_p)		= { "aclk_pdispp_div", "aclk_pdispp_np5" };
+PNAME(mux_clk_ispp_p)			= { "clk_ispp_div", "clk_ispp_np5" };
 PNAME(mux_usb480m_gpll_p)		= { "usb480m", "gpll" };
 PNAME(clk_gmac_src_m0_p)		= { "clk_gmac_div", "clk_gmac_rgmii_m0" };
 PNAME(clk_gmac_src_m1_p)		= { "clk_gmac_div", "clk_gmac_rgmii_m1" };
@@ -1399,7 +1400,9 @@ static const char *const rv1126_cru_critical_clocks[] __initconst = {
 #if IS_ENABLED(CONFIG_USB_EHCI_HCD_PLATFORM) || IS_ENABLED(CONFIG_USB_OHCI_HCD_PLATFORM)
 	"clk_usbhost_utmi_ohci",
 #endif
-#if IS_ENABLED(CONFIG_ROCKCHIP_MPP_VDPU2) || IS_ENABLED(CONFIG_ROCKCHIP_MPP_RKVDEC)
+#if IS_ENABLED(CONFIG_ROCKCHIP_MPP_VDPU2) || \
+    IS_ENABLED(CONFIG_ROCKCHIP_MPP_RKVDEC) || \
+    IS_ENABLED(CONFIG_ROCKCHIP_MPP_VEPU2)
 	"aclk_pdjpeg_niu",
 	"hclk_pdjpeg_niu",
 	"aclk_pdvdec_niu",

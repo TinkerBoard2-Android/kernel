@@ -202,7 +202,8 @@
 
 	display_subsystem: display-subsystem {
 		compatible = "rockchip,display-subsystem";
-		logo-memory-region = <&drm_logo>;
+		memory-region = <&drm_logo>, <&drm_cubic_lut>;
+		memory-region-names = "drm-logo", "drm-cubic-lut";
 		ports = <&vop_out>;
 
 		route {
@@ -273,6 +274,8 @@
 			scmi_clk: protocol@14 {
 				reg = <0x14>;
 				#clock-cells = <1>;
+
+				rockchip,clk-init = <1416000000>;
 			};
 		};
 
@@ -301,6 +304,11 @@
 
 		drm_logo: drm-logo@00000000 {
 			compatible = "rockchip,drm-logo";
+			reg = <0x0 0x0 0x0 0x0>;
+		};
+
+		drm_cubic_lut: drm-cubic-lut@00000000 {
+			compatible = "rockchip,drm-cubic-lut";
 			reg = <0x0 0x0 0x0 0x0>;
 		};
 	};
@@ -710,11 +718,13 @@
 					lvds_in_vp1: endpoint@1 {
 						reg = <1>;
 						remote-endpoint = <&vp1_out_lvds>;
+						status = "disabled";
 					};
 
 					lvds_in_vp2: endpoint@2 {
 						reg = <2>;
 						remote-endpoint = <&vp2_out_lvds>;
+						status = "disabled";
 					};
 				};
 			};
@@ -738,6 +748,7 @@
 					rgb_in_vp2: endpoint@2 {
 						reg = <2>;
 						remote-endpoint = <&vp2_out_rgb>;
+						status = "disabled";
 					};
 				};
 			};
@@ -827,7 +838,7 @@
 			<&cru CPLL_250M>, <&cru CPLL_125M>,
 			<&cru CPLL_100M>, <&cru CPLL_62P5M>,
 			<&cru CPLL_50M>, <&cru CPLL_25M>,
-			<&cru PLL_GPLL>, <&cru ARMCLK>,
+			<&cru PLL_GPLL>,
 			<&cru ACLK_BUS>, <&cru PCLK_BUS>,
 			<&cru ACLK_TOP_HIGH>, <&cru ACLK_TOP_LOW>,
 			<&cru HCLK_TOP>, <&cru PCLK_TOP>,
@@ -847,7 +858,7 @@
 			<250000000>, <125000000>,
 			<100000000>, <62500000>,
 			<50000000>, <25000000>,
-			<1188000000>, <600000000>,
+			<1188000000>,
 			<150000000>, <100000000>,
 			<500000000>, <400000000>,
 			<150000000>, <100000000>,
@@ -1445,8 +1456,10 @@
 		interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>,
 			     <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
 		interrupt-names = "csi-intr1", "csi-intr2";
-		clocks = <&cru PCLK_CSI2HOST1>, <&cru SRST_P_CSI2HOST1>;
-		clock-names = "pclk_csi2host", "srst_csihost_p";
+		clocks = <&cru PCLK_CSI2HOST1>;
+		clock-names = "pclk_csi2host";
+		resets = <&cru SRST_P_CSI2HOST1>;
+		reset-names = "srst_csihost_p";
 		status = "disabled";
 	};
 
@@ -1622,7 +1635,7 @@
 			#address-cells = <1>;
 			#size-cells = <0>;
 
-			port@0 {
+			vp0: port@0 {
 				#address-cells = <1>;
 				#size-cells = <0>;
 				reg = <0>;
@@ -1648,7 +1661,7 @@
 				};
 			};
 
-			port@1 {
+			vp1: port@1 {
 				#address-cells = <1>;
 				#size-cells = <0>;
 				reg = <1>;
@@ -1679,7 +1692,7 @@
 				};
 			};
 
-			port@2 {
+			vp2: port@2 {
 				#address-cells = <1>;
 				#size-cells = <0>;
 
@@ -1737,11 +1750,13 @@
 				dsi0_in_vp0: endpoint@0 {
 					reg = <0>;
 					remote-endpoint = <&vp0_out_dsi0>;
+					status = "disabled";
 				};
 
 				dsi0_in_vp1: endpoint@1 {
 					reg = <1>;
 					remote-endpoint = <&vp1_out_dsi0>;
+					status = "disabled";
 				};
 			};
 		};
@@ -1775,11 +1790,13 @@
 				dsi1_in_vp0: endpoint@0 {
 					reg = <0>;
 					remote-endpoint = <&vp0_out_dsi1>;
+					status = "disabled";
 				};
 
 				dsi1_in_vp1: endpoint@1 {
 					reg = <1>;
 					remote-endpoint = <&vp1_out_dsi1>;
+					status = "disabled";
 				};
 			};
 		};
@@ -1815,10 +1832,12 @@
 				hdmi_in_vp0: endpoint@0 {
 					reg = <0>;
 					remote-endpoint = <&vp0_out_hdmi>;
+					status = "disabled";
 				};
 				hdmi_in_vp1: endpoint@1 {
 					reg = <1>;
 					remote-endpoint = <&vp1_out_hdmi>;
+					status = "disabled";
 				};
 			};
 		};
@@ -1850,11 +1869,13 @@
 				edp_in_vp0: endpoint@0 {
 					reg = <0>;
 					remote-endpoint = <&vp0_out_edp>;
+					status = "disabled";
 				};
 
 				edp_in_vp1: endpoint@1 {
 					reg = <1>;
 					remote-endpoint = <&vp1_out_edp>;
+					status = "disabled";
 				};
 			};
 		};
@@ -3053,11 +3074,11 @@
 		reset-names = "tsadc", "tsadc-apb", "tsadc-phy";
 		#thermal-sensor-cells = <1>;
 		rockchip,hw-tshut-temp = <120000>;
-		rockchip,hw-tshut-mode = <1>; /* tshut mode 0:CRU 1:GPIO */
+		rockchip,hw-tshut-mode = <0>; /* tshut mode 0:CRU 1:GPIO */
 		rockchip,hw-tshut-polarity = <0>; /* tshut polarity 0:LOW 1:HIGH */
 		pinctrl-names = "gpio", "otpout";
-		pinctrl-0 = <&tsadc_gpio>;
-		pinctrl-1 = <&tsadcm0_shut>;
+		pinctrl-0 = <&tsadc_gpio_func>;
+		pinctrl-1 = <&tsadc_shutorg>;
 		status = "disabled";
 	};
 

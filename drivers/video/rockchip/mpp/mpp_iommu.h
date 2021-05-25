@@ -37,9 +37,13 @@ struct mpp_dma_buffer {
 	struct device *dev;
 };
 
+#define MPP_SESSION_MAX_BUFFERS		60
+
 struct mpp_dma_session {
 	/* the buffer used in session */
-	struct list_head buffer_list;
+	struct list_head unused_list;
+	struct list_head used_list;
+	struct mpp_dma_buffer dma_bufs[MPP_SESSION_MAX_BUFFERS];
 	/* the mutex for the above buffer list */
 	struct mutex list_mutex;
 	/* the max buffer num for the buffer list */
@@ -72,7 +76,7 @@ struct mpp_iommu_info {
 };
 
 struct mpp_dma_session *
-mpp_dma_session_create(struct device *dev);
+mpp_dma_session_create(struct device *dev, u32 max_buffers);
 int mpp_dma_session_destroy(struct mpp_dma_session *dma);
 
 struct mpp_dma_buffer *
@@ -103,5 +107,38 @@ u32 mpp_iommu_get_dte_addr(struct mpp_rk_iommu *iommu);
 int mpp_iommu_enable(struct mpp_rk_iommu *iommu);
 int mpp_iommu_disable(struct mpp_rk_iommu *iommu);
 int mpp_iommu_refresh(struct mpp_iommu_info *info, struct device *dev);
+int mpp_iommu_flush_tlb(struct mpp_iommu_info *info);
+
+static inline int mpp_iommu_down_read(struct mpp_iommu_info *info)
+{
+	if (info)
+		down_read(&info->rw_sem);
+
+	return 0;
+}
+
+static inline int mpp_iommu_up_read(struct mpp_iommu_info *info)
+{
+	if (info)
+		up_read(&info->rw_sem);
+
+	return 0;
+}
+
+static inline int mpp_iommu_down_write(struct mpp_iommu_info *info)
+{
+	if (info)
+		down_write(&info->rw_sem);
+
+	return 0;
+}
+
+static inline int mpp_iommu_up_write(struct mpp_iommu_info *info)
+{
+	if (info)
+		up_write(&info->rw_sem);
+
+	return 0;
+}
 
 #endif

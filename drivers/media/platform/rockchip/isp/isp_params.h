@@ -23,7 +23,7 @@ struct rkisp_isp_params_ops {
 	void (*disable_isp)(struct rkisp_isp_params_vdev *params_vdev);
 	void (*isr_hdl)(struct rkisp_isp_params_vdev *params_vdev, u32 isp_mis);
 	void (*param_cfg)(struct rkisp_isp_params_vdev *params_vdev, u32 frame_id,
-			  u32 rdbk_times, enum rkisp_params_type type);
+			  enum rkisp_params_type type);
 	void (*param_cfgsram)(struct rkisp_isp_params_vdev *params_vdev);
 	void (*get_ldchbuf_inf)(struct rkisp_isp_params_vdev *params_vdev,
 				struct rkisp_ldchbuf_info *ldchbuf);
@@ -78,6 +78,8 @@ struct rkisp_isp_params_vdev {
 	struct isp21_drc_cfg cur_hdrdrc;
 	struct isp2x_lsc_cfg cur_lsccfg;
 	struct sensor_exposure_cfg exposure;
+
+	bool is_subs_evt;
 };
 
 /* config params before ISP streaming */
@@ -94,8 +96,7 @@ void rkisp_unregister_params_vdev(struct rkisp_isp_params_vdev *params_vdev);
 
 void rkisp_params_isr(struct rkisp_isp_params_vdev *params_vdev, u32 isp_mis);
 
-void rkisp_params_cfg(struct rkisp_isp_params_vdev *params_vdev,
-		      u32 frame_id, u32 rdbk_times);
+void rkisp_params_cfg(struct rkisp_isp_params_vdev *params_vdev, u32 frame_id);
 
 void rkisp_params_cfgsram(struct rkisp_isp_params_vdev *params_vdev);
 void rkisp_params_get_ldchbuf_inf(struct rkisp_isp_params_vdev *params_vdev,

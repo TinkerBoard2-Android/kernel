@@ -9,7 +9,7 @@
 #include <linux/types.h>
 #include <linux/v4l2-controls.h>
 
-#define ISPP_API_VERSION		KERNEL_VERSION(1, 5, 1)
+#define ISPP_API_VERSION		KERNEL_VERSION(1, 6, 0)
 
 #define ISPP_ID_TNR			(0)
 #define ISPP_ID_NR			(1)
@@ -190,6 +190,7 @@ struct rkispp_nr_config {
 	u8 uvnr_step1_en;
 	u8 uvnr_step2_en;
 	u8 nr_gain_en;
+	u8 uvnr_sd32_self_en;
 	u8 uvnr_nobig_en;
 	u8 uvnr_big_en;
 	u8 uvnr_gain_1sigma;

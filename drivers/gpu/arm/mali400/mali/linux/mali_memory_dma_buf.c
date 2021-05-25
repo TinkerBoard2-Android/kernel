@@ -9,7 +9,7 @@
  */
 
 #include <linux/fs.h>      /* file system operations */
-#include <asm/uaccess.h>        /* user space access */
+#include <linux/uaccess.h>      /* user space access */
 #include <linux/dma-buf.h>
 #include <linux/scatterlist.h>
 #include <linux/rbtree.h>
@@ -258,7 +258,7 @@ int mali_dma_buf_get_size(struct mali_session_data *session, _mali_uk_dma_buf_ge
 	buf = dma_buf_get(fd);
 	if (IS_ERR_OR_NULL(buf)) {
 		MALI_DEBUG_PRINT_ERROR(("Failed to get dma-buf from fd: %d\n", fd));
-		return PTR_RET(buf);
+		return PTR_ERR_OR_ZERO(buf);
 	}
 
 	if (0 != put_user(buf->size, &user_arg->size)) {

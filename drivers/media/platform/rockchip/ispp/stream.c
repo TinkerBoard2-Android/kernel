@@ -937,7 +937,8 @@ static int config_nr_shp(struct rkispp_device *dev)
 			rkispp_write(dev, RKISPP_SHARP_WR_Y_BASE, val);
 			rkispp_write(dev, RKISPP_SHARP_WR_UV_BASE, val);
 			rkispp_write(dev, RKISPP_SHARP_WR_VIR_STRIDE, ALIGN(width * mult, 16) >> 2);
-			rkispp_set_bits(dev, RKISPP_SHARP_CTRL, SW_SHP_WR_FORMAT_MASK, FMT_FBC);
+			if (dev->inp == INP_ISP)
+				rkispp_set_bits(dev, RKISPP_SHARP_CTRL, SW_SHP_WR_FORMAT_MASK, FMT_FBC);
 		}
 	}
 
@@ -1045,6 +1046,9 @@ static void rkispp_start_3a_run(struct rkispp_device *dev)
 	};
 	int ret;
 
+	if (!params_vdev->is_subs_evt)
+		return;
+
 	v4l2_event_queue(vdev, &ev);
 	ret = wait_event_timeout(dev->sync_onoff,
 			params_vdev->streamon && !params_vdev->first_params,
@@ -1065,6 +1069,9 @@ static void rkispp_stop_3a_run(struct rkispp_device *dev)
 		.type = CIFISP_V4L2_EVENT_STREAM_STOP,
 	};
 	int ret;
+
+	if (!params_vdev->is_subs_evt)
+		return;
 
 	v4l2_event_queue(vdev, &ev);
 	ret = wait_event_timeout(dev->sync_onoff, !params_vdev->streamon,
@@ -1095,8 +1102,7 @@ static int config_modules(struct rkispp_device *dev)
 {
 	int ret;
 
-	if (dev->inp == INP_ISP)
-		rkispp_start_3a_run(dev);
+	rkispp_start_3a_run(dev);
 
 	v4l2_dbg(1, rkispp_debug, &dev->v4l2_dev,
 		 "stream module ens:0x%x\n", dev->stream_vdev.module_ens);
@@ -1118,6 +1124,8 @@ static int config_modules(struct rkispp_device *dev)
 	if (ret < 0)
 		goto free_nr;
 
+	/* config default params */
+	rkispp_params_cfg(&dev->params_vdev, 0);
 	return 0;
 free_nr:
 	nr_free_buf(dev);
@@ -1267,7 +1275,8 @@ static int is_stopped_mb(struct rkispp_stream *stream)
 		val = dev->hw_dev->dummy_buf.dma_addr;
 		rkispp_write(dev, RKISPP_SHARP_WR_Y_BASE, val);
 		rkispp_write(dev, RKISPP_SHARP_WR_UV_BASE, val);
-		rkispp_set_bits(dev, RKISPP_SHARP_CTRL, SW_SHP_WR_FORMAT_MASK, FMT_FBC);
+		if (dev->inp == INP_ISP)
+			rkispp_set_bits(dev, RKISPP_SHARP_CTRL, SW_SHP_WR_FORMAT_MASK, FMT_FBC);
 	}
 
 	/* for wait last frame */
@@ -1560,8 +1569,7 @@ static void rkispp_stream_stop(struct rkispp_stream *stream)
 	stream->stopping = true;
 	if (atomic_read(&dev->stream_vdev.refcnt) == 1) {
 		v4l2_subdev_call(&dev->ispp_sdev.sd, video, s_stream, false);
-		if (dev->inp == INP_ISP)
-			rkispp_stop_3a_run(dev);
+		rkispp_stop_3a_run(dev);
 		if (dev->stream_vdev.fec.is_end &&
 		    (dev->dev_id != dev->hw_dev->cur_dev_id || dev->hw_dev->is_idle))
 			is_wait = false;
@@ -1837,6 +1845,7 @@ static int rkispp_init_vb2_queue(struct vb2_queue *q,
 	q->allow_cache_hints = 1;
 	if (stream->isppdev->hw_dev->is_dma_contig)
 		q->dma_attrs = DMA_ATTR_FORCE_CONTIGUOUS;
+	q->gfp_flags = GFP_DMA32;
 	return vb2_queue_init(q);
 }
 
@@ -2008,6 +2017,18 @@ static const struct v4l2_file_operations rkispp_fops = {
 	.mmap = vb2_fop_mmap,
 };
 
+static int rkispp_enum_input(struct file *file, void *priv,
+			struct v4l2_input *input)
+{
+	if (input->index > 0)
+		return -EINVAL;
+
+	input->type = V4L2_INPUT_TYPE_CAMERA;
+	strscpy(input->name, "Camera", sizeof(input->name));
+
+	return 0;
+}
+
 static int rkispp_try_fmt_vid_mplane(struct file *file, void *fh,
 					 struct v4l2_format *f)
 {
@@ -2085,6 +2106,7 @@ static const struct v4l2_ioctl_ops rkispp_v4l2_ioctl_ops = {
 	.vidioc_prepare_buf = vb2_ioctl_prepare_buf,
 	.vidioc_streamon = vb2_ioctl_streamon,
 	.vidioc_streamoff = vb2_ioctl_streamoff,
+	.vidioc_enum_input = rkispp_enum_input,
 	.vidioc_try_fmt_vid_cap_mplane = rkispp_try_fmt_vid_mplane,
 	.vidioc_enum_fmt_vid_cap_mplane = rkispp_enum_fmt_vid_mplane,
 	.vidioc_s_fmt_vid_cap_mplane = rkispp_s_fmt_vid_mplane,
@@ -2537,6 +2559,10 @@ static void nr_work_event(struct rkispp_device *dev,
 			dbuf = vdev->nr.cur_rd->dbuf[GROUP_BUF_PIC];
 			dummy = dbuf_to_dummy(dbuf, &vdev->tnr.buf.iir, size);
 			val = dummy->dma_addr;
+			if (dev->hw_dev->is_first && dev->hw_dev->first_frame_dma != -1) {
+				val = dev->hw_dev->first_frame_dma;
+				dev->hw_dev->first_frame_dma = -1;
+			}
 			rkispp_write(dev, RKISPP_NR_ADDR_BASE_Y, val);
 			val += vdev->nr.uv_offset;
 			rkispp_write(dev, RKISPP_NR_ADDR_BASE_UV, val);
@@ -2718,13 +2744,10 @@ static void tnr_work_event(struct rkispp_device *dev,
 	if (!buf_rd && !buf_wr && is_isr) {
 		vdev->tnr.is_end = true;
 
-		if (dev->hw_dev->is_first && vdev->tnr.nxt_rd && vdev->tnr.cur_wr) {
+		if (dev->hw_dev->is_first && vdev->tnr.nxt_rd) {
 			struct rkispp_isp_buf_pool *tbuf = get_pool_buf(dev, vdev->tnr.nxt_rd);
 
-			dbuf = vdev->tnr.cur_wr->dbuf[GROUP_BUF_PIC];
-			dummy = dbuf_to_dummy(dbuf, &vdev->tnr.buf.iir, size);
-			memcpy(dummy->vaddr, tbuf->vaddr[GROUP_BUF_PIC], dummy->size);
-			rkispp_prepare_buffer(dev, dummy);
+			dev->hw_dev->first_frame_dma = tbuf->dma[GROUP_BUF_PIC];
 		}
 
 		if (vdev->tnr.cur_rd) {

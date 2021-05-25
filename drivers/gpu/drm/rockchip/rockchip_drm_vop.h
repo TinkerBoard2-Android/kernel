@@ -193,6 +193,7 @@ struct vop_ctrl {
 	struct vop_reg sw_uv_offset_en;
 	struct vop_reg dsp_out_yuv;
 	struct vop_reg dsp_data_swap;
+	struct vop_reg yuv_clip;
 	struct vop_reg dsp_ccir656_avg;
 	struct vop_reg dsp_black;
 	struct vop_reg dsp_blank;
@@ -508,6 +509,7 @@ struct vop2_win_regs {
 	struct vop_reg uv_mst;
 	struct vop_reg yrgb_vir;
 	struct vop_reg uv_vir;
+	struct vop_reg yuv_clip;
 	struct vop_reg lb_mode;
 	struct vop_reg y2r_en;
 	struct vop_reg r2y_en;
@@ -750,6 +752,7 @@ struct vop2_ctrl {
 	struct vop_reg auto_gating_en;
 	struct vop_reg ovl_cfg_done_port;
 	struct vop_reg ovl_port_mux_cfg_done_imd;
+	struct vop_reg ovl_port_mux_cfg;
 	struct vop_reg if_ctrl_cfg_done_imd;
 	struct vop_reg version;
 	struct vop_reg standby;
@@ -1118,6 +1121,7 @@ static inline int interpolate(int x1, int y1, int x2, int y2, int x)
 	return y1 + (y2 - y1) * (x - x1) / (x2 - x1);
 }
 
+extern void vop2_standby(struct drm_crtc *crtc, bool standby);
 extern const struct component_ops vop_component_ops;
 extern const struct component_ops vop2_component_ops;
 #endif /* _ROCKCHIP_DRM_VOP_H */

@@ -68,14 +68,8 @@ static struct uac1_ac_header_descriptor_2 ac_header_desc = {
 	.bDescriptorType =	USB_DT_CS_INTERFACE,
 	.bDescriptorSubtype =	UAC_HEADER,
 	.bcdADC =		cpu_to_le16(0x0100),
-	.baInterfaceNr = {
-	/*
-	 * Assume the maximum interfaces number of the UAC AudioStream
-	 * interfaces
-	 */
-		[0] =		1,
-		[1] =		2,
-	}
+	/* .baInterfaceNr[0] = DYNAMIC */
+	/* .baInterfaceNr[1] = DYNAMIC */
 };
 
 static struct uac_input_terminal_descriptor usb_out_it_desc = {
@@ -414,10 +408,10 @@ static void uac_cs_attr_sample_rate(struct usb_ep *ep, struct usb_request *req)
 
 	val = buf[0] | (buf[1] << 8) | (buf[2] << 16);
 
-	if (uac1->ctl_id == (USB_DIR_IN | 1)) {
+	if (uac1->ctl_id == agdev->in_ep->address) {
 		opts->p_srate_active = val;
 		u_audio_set_playback_srate(agdev, opts->p_srate_active);
-	} else if (uac1->ctl_id == (USB_DIR_OUT | 1)) {
+	} else if (uac1->ctl_id == agdev->out_ep->address) {
 		opts->c_srate_active = val;
 		u_audio_set_capture_srate(agdev, opts->c_srate_active);
 	}
@@ -888,6 +882,8 @@ static int f_audio_bind(struct usb_configuration *c, struct usb_function *f)
 	ac_interface_desc.bInterfaceNumber = status;
 	uac1->ac_intf = status;
 	uac1->ac_alt = 0;
+	ac_header_desc.baInterfaceNr[0] = ++status;
+	ac_header_desc.baInterfaceNr[1] = ++status;
 
 	if (EPOUT_EN(audio_opts)) {
 		status = usb_interface_id(c, f);

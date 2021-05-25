@@ -41,6 +41,7 @@
 #include <linux/rk-camera-module.h>
 #include <media/v4l2-fwnode.h>
 #include "common.h"
+#include "isp_ispp.h"
 
 #define CIF_ISP_INPUT_W_MAX		4416
 #define CIF_ISP_INPUT_H_MAX		3312
@@ -48,8 +49,10 @@
 #define CIF_ISP_INPUT_H_MAX_V12		2448
 #define CIF_ISP_INPUT_W_MAX_V13		1920
 #define CIF_ISP_INPUT_H_MAX_V13		1080
-#define CIF_ISP_INPUT_W_MIN		32
-#define CIF_ISP_INPUT_H_MIN		16
+#define CIF_ISP_INPUT_W_MAX_V21		4096
+#define CIF_ISP_INPUT_H_MAX_V21		3072
+#define CIF_ISP_INPUT_W_MIN		208
+#define CIF_ISP_INPUT_H_MIN		128
 #define CIF_ISP_OUTPUT_W_MAX		CIF_ISP_INPUT_W_MAX
 #define CIF_ISP_OUTPUT_H_MAX		CIF_ISP_INPUT_H_MAX
 #define CIF_ISP_OUTPUT_W_MIN		CIF_ISP_INPUT_W_MIN
@@ -118,6 +121,8 @@ struct rkisp_isp_subdev {
 	bool dphy_errctrl_disabled;
 	atomic_t frm_sync_seq;
 	enum v4l2_quantization quantization;
+	u64 frm_timestamp;
+	struct frame_debug_info dbg;
 };
 
 struct rkisp_emd_data {

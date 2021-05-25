@@ -318,6 +318,20 @@ static int analogix_dp_set_enhanced_mode(struct analogix_dp_device *dp)
 	if (ret < 0)
 		return ret;
 
+	if (!data) {
+		/*
+		 * A setting of 1 indicates that this is an eDP device that
+		 * uses only Enhanced Framing, independently of the setting by
+		 * the source of ENHANCED_FRAME_EN
+		 */
+		ret = drm_dp_dpcd_readb(&dp->aux, DP_EDP_CONFIGURATION_CAP,
+					&data);
+		if (ret < 0)
+			return ret;
+
+		data = !!(data & DP_FRAMING_CHANGE_CAP);
+	}
+
 	analogix_dp_enable_enhanced_mode(dp, data);
 
 	dp->link_train.enhanced_framing = data;
@@ -1085,7 +1099,10 @@ static int analogix_dp_loader_protect(struct drm_connector *connector, bool on)
 
 	if (dp->plat_data->panel)
 		drm_panel_loader_protect(dp->plat_data->panel, on);
+
 	if (on) {
+		dp->dpms_mode = DRM_MODE_DPMS_ON;
+
 		pm_runtime_get_sync(dp->dev);
 
 		ret = analogix_dp_detect_sink_psr(dp);
@@ -1097,8 +1114,6 @@ static int analogix_dp_loader_protect(struct drm_connector *connector, bool on)
 			if (ret)
 				return ret;
 		}
-	} else {
-		pm_runtime_put(dp->dev);
 	}
 
 	return 0;
@@ -1133,6 +1148,22 @@ analogix_dp_detect(struct drm_connector *connector, bool force)
 	return status;
 }
 
+static int
+analogix_dp_atomic_connector_get_property(struct drm_connector *connector,
+				      const struct drm_connector_state *state,
+				      struct drm_property *property,
+				      uint64_t *val)
+{
+	struct analogix_dp_device *dp = to_dp(connector);
+	const struct analogix_dp_property_ops *ops = dp->plat_data->property_ops;
+
+	if (ops && ops->get_property)
+		return ops->get_property(connector, state, property,
+					 val, dp->plat_data);
+	else
+		return -EINVAL;
+}
+
 static const struct drm_connector_funcs analogix_dp_connector_funcs = {
 	.fill_modes = drm_helper_probe_single_connector_modes,
 	.detect = analogix_dp_detect,
@@ -1140,6 +1171,7 @@ static const struct drm_connector_funcs analogix_dp_connector_funcs = {
 	.reset = drm_atomic_helper_connector_reset,
 	.atomic_duplicate_state = drm_atomic_helper_connector_duplicate_state,
 	.atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
+	.atomic_get_property = analogix_dp_atomic_connector_get_property,
 };
 
 static int analogix_dp_bridge_attach(struct drm_bridge *bridge)
@@ -1155,6 +1187,8 @@ static int analogix_dp_bridge_attach(struct drm_bridge *bridge)
 	}
 
 	if (!dp->plat_data->skip_connector) {
+		const struct analogix_dp_property_ops *ops = dp->plat_data->property_ops;
+
 		connector = &dp->connector;
 		connector->polled = DRM_CONNECTOR_POLL_HPD;
 
@@ -1169,6 +1203,9 @@ static int analogix_dp_bridge_attach(struct drm_bridge *bridge)
 		drm_connector_helper_add(connector,
 					 &analogix_dp_connector_helper_funcs);
 		drm_connector_attach_encoder(connector, encoder);
+
+		if (ops && ops->attach_properties)
+			ops->attach_properties(connector);
 	}
 
 	/*

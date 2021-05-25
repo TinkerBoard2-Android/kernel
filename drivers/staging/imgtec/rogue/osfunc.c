@@ -58,7 +58,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <asm/tlbflush.h>
 #include <linux/timer.h>
 #include <linux/capability.h>
-#include <asm/uaccess.h>
+#include <linux/uaccess.h>
 #include <linux/spinlock.h>
 
 #include <linux/sched/clock.h>
@@ -1054,13 +1054,13 @@ OSMapPhysToLin(IMG_CPU_PHYADDR BasePAddr,
 	switch (ui32MappingFlags)
 	{
 		case PVRSRV_MEMALLOCFLAG_CPU_UNCACHED:
-			pvLinAddr = (void *)ioremap_nocache(BasePAddr.uiAddr, ui32Bytes);
+			pvLinAddr = (void *)ioremap(BasePAddr.uiAddr, ui32Bytes);
 			break;
 		case PVRSRV_MEMALLOCFLAG_CPU_WRITE_COMBINE:
 #if defined(CONFIG_X86) || defined(CONFIG_ARM) || defined(CONFIG_ARM64)
 			pvLinAddr = (void *)ioremap_wc(BasePAddr.uiAddr, ui32Bytes);
 #else
-			pvLinAddr = (void *)ioremap_nocache(BasePAddr.uiAddr, ui32Bytes);
+			pvLinAddr = (void *)ioremap(BasePAddr.uiAddr, ui32Bytes);
 #endif
 			break;
 		case PVRSRV_MEMALLOCFLAG_CPU_CACHED:

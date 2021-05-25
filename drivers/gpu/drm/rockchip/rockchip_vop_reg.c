@@ -520,7 +520,7 @@ static const uint32_t vop_csc_r2y_bt601[] = {
 };
 
 static const uint32_t vop_csc_r2y_bt601_12_235[] = {
-	0x02040107, 0xff680064, 0x01c2fed6, 0xffb7fe87,
+	0x02040107, 0xff680064, 0x01c2fed6, 0xfe8701c2,
 	0x0000ffb7, 0x00010200, 0x00080200, 0x00080200,
 };
 
@@ -1700,6 +1700,7 @@ static const struct vop_ctrl rv1126_ctrl_data = {
 	.dither_down_mode = VOP_REG(RK3366_LIT_DSP_CTRL2, 0x1, 6),
 	.dither_up_en = VOP_REG(RK3366_LIT_DSP_CTRL2, 0x1, 2),
 	.dsp_data_swap = VOP_REG(RK3366_LIT_DSP_CTRL2, 0x1f, 9),
+	.yuv_clip = VOP_REG(RK3366_LIT_SYS_CTRL2, 0x1, 4),
 	.dsp_ccir656_avg = VOP_REG(RK3366_LIT_SYS_CTRL2, 0x1, 5),
 	.dsp_black = VOP_REG(RK3366_LIT_DSP_CTRL2, 0x1, 15),
 	.dsp_blank = VOP_REG(RK3366_LIT_DSP_CTRL2, 0x1, 14),
