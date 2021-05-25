@@ -1520,33 +1520,33 @@
 &pinctrl {
 	fusb30x {
 		fusb0_int: fusb0-int {
-			rockchip,pins = <1 2 RK_FUNC_GPIO &pcfg_pull_up>;
+			rockchip,pins = <1 RK_PA2 RK_FUNC_GPIO &pcfg_pull_up>;
 		};
 	};
 
 	sdio-pwrseq {
 		wifi_enable_h: wifi-enable-h {
 			rockchip,pins =
-				<0 10 RK_FUNC_GPIO &pcfg_pull_none>;
+				<0 RK_PB2 RK_FUNC_GPIO &pcfg_pull_none>;
 		};
 	};
 
 	wireless-bluetooth {
 		uart0_gpios: uart0-gpios {
 			rockchip,pins =
-				<2 19 RK_FUNC_GPIO &pcfg_pull_none>;
+				<2 RK_PC3 RK_FUNC_GPIO &pcfg_pull_none>;
 		};
 		bt_reset_gpio: bt-reset-gpio {
 			rockchip,pins =
-				<0 9 RK_FUNC_GPIO &pcfg_pull_none>;
+				<0 RK_PB1 RK_FUNC_GPIO &pcfg_pull_none>;
 		};
 		bt_wake_gpio: bt-wake-gpio {
 			rockchip,pins =
-				<2 26 RK_FUNC_GPIO &pcfg_pull_none>;
+				<2 RK_PD2 RK_FUNC_GPIO &pcfg_pull_none>;
 		};
 		bt_irq_gpio: bt-irq-gpio {
 			rockchip,pins =
-				<0 4 RK_FUNC_GPIO &pcfg_pull_down>;
+				<0 RK_PA4 RK_FUNC_GPIO &pcfg_pull_down>;
 		};
 	};
 
@@ -1554,65 +1554,65 @@
 		cif_clkout: cif-clkout {
 			rockchip,pins =
 				/*cif_clkout*/
-				<2 11 RK_FUNC_3 &pcfg_pull_none>;
+				<2 RK_PB3 3 &pcfg_pull_none>;
 		};
 
 		isp_dvp_d0d7: isp-dvp-d0d7 {
 			rockchip,pins =
 				/*cif_data0*/
-				<2 0 RK_FUNC_3 &pcfg_pull_none>,
+				<2 RK_PA0 3 &pcfg_pull_none>,
 				/*cif_data1*/
-				<2 1 RK_FUNC_3 &pcfg_pull_none>,
+				<2 RK_PA1 3 &pcfg_pull_none>,
 				/*cif_data2*/
-				<2 2 RK_FUNC_3 &pcfg_pull_none>,
+				<2 RK_PA2 3 &pcfg_pull_none>,
 				/*cif_data3*/
-				<2 3 RK_FUNC_3 &pcfg_pull_none>,
+				<2 RK_PA3 3 &pcfg_pull_none>,
 				/*cif_data4*/
-				<2 4 RK_FUNC_3 &pcfg_pull_none>,
+				<2 RK_PA4 3 &pcfg_pull_none>,
 				/*cif_data5*/
-				<2 5 RK_FUNC_3 &pcfg_pull_none>,
+				<2 RK_PA5 3 &pcfg_pull_none>,
 				/*cif_data6*/
-				<2 6 RK_FUNC_3 &pcfg_pull_none>,
+				<2 RK_PA6 3 &pcfg_pull_none>,
 				/*cif_data7*/
-				<2 7 RK_FUNC_3 &pcfg_pull_none>,
+				<2 RK_PA7 3 &pcfg_pull_none>,
 				/*cif_sync*/
-				<2 8 RK_FUNC_3 &pcfg_pull_none>,
+				<2 RK_PB0 3 &pcfg_pull_none>,
 				/*cif_href*/
-				<2 9 RK_FUNC_3 &pcfg_pull_none>,
+				<2 RK_PB1 3 &pcfg_pull_none>,
 				/*cif_clkin*/
-				<2 10 RK_FUNC_3 &pcfg_pull_none>;
+				<2 RK_PB2 3 &pcfg_pull_none>;
 		};
 	};
 
 	buttons {
 		pwrbtn: pwrbtn {
-			rockchip,pins = <0 5 RK_FUNC_GPIO &pcfg_pull_up>;
+			rockchip,pins = <0 RK_PA5 RK_FUNC_GPIO &pcfg_pull_up>;
 		};
 	};
 
 	lcd-panel {
 		lcd_panel_reset: lcd-panel-reset {
-			rockchip,pins = <4 30 RK_FUNC_GPIO &pcfg_pull_up>;
+			rockchip,pins = <4 RK_PD6 RK_FUNC_GPIO &pcfg_pull_up>;
 		};
 	};
 
 	hdmiin {
 		hdmiin_gpios: hdmiin_gpios {
 		rockchip,pins =
-				<2 5 RK_FUNC_GPIO &pcfg_pull_none>,
-				<2 6 RK_FUNC_GPIO &pcfg_pull_none>,
-				<2 7 RK_FUNC_GPIO &pcfg_pull_none>,
-				<2 8 RK_FUNC_GPIO &pcfg_pull_none>,
-				<2 9 RK_FUNC_GPIO &pcfg_pull_none>,
-				<2 12 RK_FUNC_GPIO &pcfg_pull_none>;
+				<2 RK_PA5 RK_FUNC_GPIO &pcfg_pull_none>,
+				<2 RK_PA6 RK_FUNC_GPIO &pcfg_pull_none>,
+				<2 RK_PA7 RK_FUNC_GPIO &pcfg_pull_none>,
+				<2 RK_PB0 RK_FUNC_GPIO &pcfg_pull_none>,
+				<2 RK_PB1 RK_FUNC_GPIO &pcfg_pull_none>,
+				<2 RK_PB4 RK_FUNC_GPIO &pcfg_pull_none>;
 		};
 	};
 
 	pmic {
 		pmic_int_l: pmic-int-l {
 			rockchip,pins =
-				<1 18 RK_FUNC_GPIO &pcfg_pull_up>,
-				<0 9 RK_FUNC_GPIO &pcfg_pull_none>; /* GPIO0_B1 */
+				<1 RK_PC2 RK_FUNC_GPIO &pcfg_pull_up>,
+				<0 RK_PB1 RK_FUNC_GPIO &pcfg_pull_none>; /* GPIO0_B1 */
 		};
 
 		pmic_dvs2: pmic-dvs2 {
@@ -1632,7 +1632,7 @@
 	sd {
 		sdmmc0_pwr_h: sdmmc0-pwr-h {
 			rockchip,pins =
-				<RK_GPIO0 RK_PA1 RK_FUNC_GPIO &pcfg_pull_none>;
+				<0 RK_PA1 RK_FUNC_GPIO &pcfg_pull_none>;
 		};
 	};
 
