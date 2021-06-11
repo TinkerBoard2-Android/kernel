@@ -150,6 +150,7 @@
 
 	backlight: backlight {
 		compatible = "pwm-backlight";
+		status = "disabled";
 		brightness-levels = <
 			  0   1   2   3   4   5   6   7
 			  8   9  10  11  12  13  14  15
@@ -377,6 +378,7 @@
 
 	panel: panel {
 		compatible = "simple-panel";
+		status = "disabled";
 		backlight = <&backlight>;
 		power-supply = <&vcc_lcd>;
 		enable-gpios = <&gpio1 13 GPIO_ACTIVE_HIGH>;
@@ -940,6 +942,20 @@
 	};
 };
 
+&i2c8 {
+	status = "okay";
+
+	tinker_mcu: tinker_mcu@45 {
+		compatible = "tinker_mcu";
+		reg = <0x45>;
+	};
+
+	tinker_mcu_ili9881c: tinker_mcu_ili9881c@36 {
+		compatible = "tinker_mcu_ili9881c";
+		reg = <0x36>;
+	};
+};
+
 &i2s2 {
 	status = "okay";
 };
@@ -1292,7 +1308,9 @@
 };
 
 &dsi {
+	status = "okay";
 	panel@0 {
+		compatible ="asus-dsi-panel";
 		reg = <0>;
 
 		ports {
@@ -1407,7 +1425,7 @@
 };
 
 &edp {
-	status = "okay";
+	status = "disabled";
 	force-hpd;
 
 	ports {
@@ -1427,6 +1445,34 @@
 
 &hdmi_in_vopb {
 	status = "disabled";
+};
+
+&edp_in_vopb {
+	status = "disabled";
+};
+
+&dsi_in_vopl {
+	status = "okay";
+};
+
+&dsi_in_vopb {
+	status = "disabled";
+};
+
+&dsi1 {
+	status = "disabled";
+};
+
+&dsi1_in_vopl {
+	status = "disabled";
+};
+
+&dsi1_in_vopb {
+	status = "disabled";
+};
+
+&vopl {
+	status = "okay";
 };
 
 &rt5651 {

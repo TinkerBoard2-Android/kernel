@@ -61,3 +61,5 @@ obj-$(CONFIG_OCXL)		+= ocxl/
 obj-$(CONFIG_MISC_RTSX)		+= cardreader/
 obj-$(CONFIG_UID_SYS_STATS)	+= uid_sys_stats.o
 obj-$(CONFIG_PIR_ASCHIP)	+= pir-aschip.o
+obj-$(CONFIG_TINKER_MCU)		+= tinker_mcu.o
+obj-$(CONFIG_TINKER_MCU_ILI9881C)	+= tinker_mcu_ili9881c.o
