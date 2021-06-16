@@ -48,7 +48,7 @@ def main():
         target_dtb_list += ' ' + new_file
 
     print target_dtb_list
-    os.system('scripts/resource_tool logo.bmp logo_kernel.bmp ' + target_dtb_list)
+    os.system('scripts/resource_tool logo.bmp tinkerboard.bmp logo_kernel.bmp ' + target_dtb_list)
     os.system('rm ' + target_dtb_list)
 
 if __name__ == '__main__':

@@ -1610,6 +1610,14 @@
 	connect = <&vopl_out_hdmi>;
 };
 
+&route_dsi{
+	status = "okay";
+	logo,uboot = "tinkerboard.bmp";
+	logo,kernel = "tinkerboard.bmp";
+	connect = <&vopl_out_dsi>;
+};
+
+
 &rt5651_sound {
 	status = "okay";
 };
