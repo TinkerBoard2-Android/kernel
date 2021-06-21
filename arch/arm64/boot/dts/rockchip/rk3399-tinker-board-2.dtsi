@@ -1123,7 +1123,7 @@
 &vopb {
 	status = "okay";
 	assigned-clocks = <&cru DCLK_VOP0_DIV>;
-	assigned-clock-parents = <&cru PLL_CPLL>;
+	assigned-clock-parents = <&cru PLL_VPLL>;
 	support-multi-area;
 };
 
@@ -1134,7 +1134,7 @@
 &vopl {
 	status = "okay";
 	assigned-clocks = <&cru DCLK_VOP1_DIV>;
-	assigned-clock-parents = <&cru PLL_VPLL>;
+	assigned-clock-parents = <&cru PLL_CPLL>;
 	support-multi-area;
 };
 
@@ -1841,7 +1841,7 @@
 	status = "disabled";
 };
 
-&hdmi_in_vopb {
+&hdmi_in_vopl {
 	status = "disabled";
 };
 
@@ -2005,7 +2005,7 @@
 
 &route_hdmi {
 	status = "okay";
-	connect = <&vopl_out_hdmi>;
+	connect = <&vopb_out_hdmi>;
 };
 
 &route_dsi{
