@@ -7,7 +7,7 @@
 #include "rk3399-tinker-board-2.dtsi"
 
 / {
-	model = "ASUSTek Tinker Board 2 (Android)";
+	model = "Tinker Board 2";
 	compatible = "rockchip,android", "rockchip,rk3399";
 	chosen: chosen {
 	bootargs = "earlycon=uart8250,mmio32,0xff1a0000 console=ttyFIQ0 androidboot.baseband=N/A androidboot.veritymode=enforcing androidboot.hardware=rk30board androidboot.console=ttyFIQ0 init=/init initrd=0x62000001,0x00800000 coherent_pool=1m";
