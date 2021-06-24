@@ -143,6 +143,7 @@ obj-$(CONFIG_VIDEO_TC358743)	+= tc358743.o
 obj-$(CONFIG_VIDEO_TC35874X)	+= tc35874x.o
 obj-$(CONFIG_VIDEO_RK628_CSI)	+= rk628_csi.o
 obj-$(CONFIG_VIDEO_IMX219)	+= imx219.o
+obj-$(CONFIG_VIDEO_CAM_SENSOR) += cam_sensor/
 obj-$(CONFIG_VIDEO_IMX258)	+= imx258.o
 obj-$(CONFIG_VIDEO_IMX258_EEPROM)	+= imx258_eeprom.o
 obj-$(CONFIG_VIDEO_IMX274)	+= imx274.o
