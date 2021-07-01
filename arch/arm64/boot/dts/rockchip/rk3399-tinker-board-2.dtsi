@@ -1895,6 +1895,14 @@
 	status = "disabled";
 };
 
+&i2c8 {
+	status = "okay";
+	m24c08@50 {
+		compatible = "at,24c08";
+		reg = <0x50>;
+	};
+};
+
 &spi1 {
 	status = "disabled";
 	max-freq = <48000000>; /* spi internal clk, don't modify */
