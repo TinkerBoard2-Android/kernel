@@ -805,6 +805,22 @@ static void stmmac_release_ptp(struct stmmac_priv *priv)
 	stmmac_ptp_unregister(priv);
 }
 
+void set_led_configuration(struct phy_device *phydev) {
+	// To switch Page0xd04
+	phy_write(phydev, 31, 0x0d04);
+
+	//Disable EEELCR mode
+	phy_write(phydev, 17, 0);
+	printk("%s: #### before setting led, Reg16 = 0x%x\n", __func__, phy_read(phydev, 16));
+
+	//LED Link speed default setting
+	phy_write(phydev, 16, 0x8910);
+	printk("%s: #### after setting led, Reg16 = 0x%x\n", __func__, phy_read(phydev, 16));
+
+	//switch to PHY`s Page0
+	phy_write(phydev, 31, 0);
+}
+
 /**
  *  stmmac_mac_flow_ctrl - Configure flow control in all queues
  *  @priv: driver private structure
