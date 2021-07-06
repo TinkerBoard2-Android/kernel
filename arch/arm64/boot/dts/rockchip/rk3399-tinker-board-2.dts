@@ -173,10 +173,6 @@
 	status = "disabled";
 };
 
-&dmc {
-	status = "disabled";
-};
-
 &fusb0 {
 	vbus-5v-gpios = <&gpio1 RK_PA3 GPIO_ACTIVE_HIGH>;
 	status = "okay";
