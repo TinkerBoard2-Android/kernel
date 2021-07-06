@@ -465,6 +465,7 @@
 	clock_in_out = "output";
 	phy-supply = <&vcc_lan>;
 	phy-mode = "rgmii";
+	wolirq-gpio = <&gpio3 16 GPIO_ACTIVE_LOW>;
 	pinctrl-names = "default";
 	pinctrl-0 = <&rgmii_pins>;
 	snps,reset-gpio = <&gpio3 RK_PB7 GPIO_ACTIVE_LOW>;
@@ -472,6 +473,7 @@
 	snps,reset-delays-us = <0 16000 72000>;
 	tx_delay = <0x25>;
 	rx_delay = <0x20>;
+	wakeup-enable = "1";
 	status = "okay";
 };
 
