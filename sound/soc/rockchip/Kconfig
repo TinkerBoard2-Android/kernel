@@ -57,6 +57,14 @@ config SND_SOC_ROCKCHIP_SPDIF
 	  Say Y or M if you want to add support for SPDIF driver for
 	  Rockchip SPDIF transceiver device.
 
+config SND_SOC_ROCKCHIP_CDNDP
+	tristate "ASoC support for Rockchip CDN DP common codec"
+	depends on SND_SOC_ROCKCHIP && CLKDEV_LOOKUP
+	select SND_SOC_ROCKCHIP_I2S
+	help
+	  Say Y or M here if you want to add support for SoC audio on Rockchip
+	  boards using CDN DP, such as RK3399 boards.
+
 config SND_SOC_ROCKCHIP_VAD
 	tristate "Rockchip Voice Activity Detection Driver"
 	depends on CLKDEV_LOOKUP && SND_SOC_ROCKCHIP
