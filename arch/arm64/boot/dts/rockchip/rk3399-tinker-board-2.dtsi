@@ -93,13 +93,6 @@
 		status = "okay";
 	};
 
-	hdmi_dp_sound: hdmi-dp-sound {
-		status = "disabled";
-		compatible = "rockchip,rk3399-hdmi-dp";
-		rockchip,cpu = <&i2s2>;
-		rockchip,codec = <&hdmi>, <&cdn_dp>;
-	};
-
 	firmware {
 		firmware_android: android {};
 	};
@@ -305,8 +298,8 @@
 		};
 	};
 
-	spdif-sound {
-		status = "okay";
+	spdif_sound: spdif-sound {
+		status = "disabled";
 		compatible = "simple-audio-card";
 		simple-audio-card,name = "ROCKCHIP,SPDIF";
 		simple-audio-card,cpu {
@@ -318,7 +311,7 @@
 	};
 
 	spdif_out: spdif-out {
-		status = "okay";
+		status = "disabled";
 		compatible = "linux,spdif-dit";
 		#sound-dai-cells = <0>;
 	};
@@ -1273,6 +1266,18 @@
 	#sound-dai-cells = <0>;
 };
 
+&dp_sound {
+	status = "okay";
+};
+
+&spdif_out {
+	status = "disabled";
+};
+
+&spdif_sound {
+	status = "disabled";
+};
+
 &i2s0 {
 	status = "disabled";
 	rockchip,playback-channels = <8>;
@@ -2029,10 +2034,6 @@
 	status = "okay";
 	extcon = <&fusb0>;
 	phys = <&tcphy0_dp>;
-};
-
-&hdmi_dp_sound {
-	status = "okay";
 };
 
 &hdmiin_sound {
