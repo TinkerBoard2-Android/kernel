@@ -1970,11 +1970,6 @@
 	status = "okay";
 };
 
-&backlight {
-	status = "okay";
-	enable-gpios = <&gpio4 29 GPIO_ACTIVE_HIGH>;
-};
-
 &edp {
 	status = "disabled";
 	force-hpd;
