@@ -1,0 +1,11 @@
+#
+# icm20948 drivers for TDK InvenSense ICM-20948 devices
+#
+
+config INV_ICM20948
+	tristate "InvenSense ICM-20948 device"
+	select IIO_BUFFER
+	select IIO_TRIGGERED_BUFFER
+	help
+	  This driver supports the TDK InvenSense ICM-20948 and
+	  9-axis motion tracking devices over I2C.
