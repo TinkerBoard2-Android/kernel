@@ -877,6 +877,7 @@ static void stmmac_adjust_link(struct net_device *dev)
 		if (phydev->speed != priv->speed) {
 			new_state = true;
 			ctrl &= ~priv->hw->link.speed_mask;
+			set_led_configuration(phydev);
 			switch (phydev->speed) {
 			case SPEED_1000:
 				ctrl |= priv->hw->link.speed1000;
